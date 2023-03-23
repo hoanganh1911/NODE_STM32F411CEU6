@@ -1,0 +1,10 @@
+15:42:10 **** Incremental Build of configuration Debug for project DMHA ****
+make -j8 all 
+arm-none-eabi-size   DMHA.elf 
+   text	   data	    bss	    dec	    hex	filename
+  20284	     28	   1684	  21996	   55ec	DMHA.elf
+Finished building: default.size.stdout
+ 
+
+15:42:11 Build Finished. 0 errors, 0 warnings. (took 239ms)
+

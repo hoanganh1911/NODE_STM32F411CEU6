@@ -1,0 +1,3 @@
+User_Libs/TFT_ILI9327/Fonts.o: ../User_Libs/TFT_ILI9327/Fonts.c \
+ ../User_Libs/TFT_ILI9327/Fonts.h
+../User_Libs/TFT_ILI9327/Fonts.h:

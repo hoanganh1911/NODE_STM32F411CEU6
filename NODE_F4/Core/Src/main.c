@@ -49,8 +49,13 @@ TIM_HandleTypeDef htim1;
 
 UART_HandleTypeDef huart2;
 
-osThreadId KeyMatrix_TaskHandle;
-osThreadId TFT_TaskHandle;
+osThreadId XuLy_Ban_PhimHandle;
+osThreadId XuLy_LoraHandle;
+osThreadId XuLy_Cap_NhatHandle;
+osThreadId XuLy_MHCHandle;
+osThreadId XuLy_MHSHandle;
+osThreadId XuLy_MHLHandle;
+osSemaphoreId Ngat_Nhan_Tu_BPHandle;
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -62,8 +67,12 @@ static void MX_I2C1_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_TIM1_Init(void);
-void StartKeyMatrix_Task(void const * argument);
-void StartTFT_Task(void const * argument);
+void Start_XuLy_Ban_Phim(void const * argument);
+void Start_XuLy_Lora(void const * argument);
+void Start_XuLy_UPD(void const * argument);
+void Start_XuLy_MHC(void const * argument);
+void Start_XuLy_MHS(void const * argument);
+void Start_XuLy_MHL(void const * argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -71,6 +80,27 @@ void StartTFT_Task(void const * argument);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+volatile bool keyChange = false;
+void delay_us (uint32_t time)
+{
+	__HAL_TIM_SET_COUNTER(&htim1, 0);
+	while ((__HAL_TIM_GET_COUNTER(&htim1))<time);
+}
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	__disable_irq();
+	if(GPIO_Pin == PCF_INT_Pin)
+	{
+		delay_us(1);
+		if(HAL_GPIO_ReadPin(PCF_INT_GPIO_Port, PCF_INT_Pin) == 0)
+		{
+			keyChange = true;
+			osSemaphoreRelease(Ngat_Nhan_Tu_BPHandle);
+		}
+
+	}
+	__enable_irq();
+}
 rtc_t time = {
 		  .DayOfWeek = THURSDAY,
 		  .Date 	 = 23,
@@ -82,6 +112,7 @@ rtc_t time = {
 		  .hi2c		 = &hi2c1
 };
 uint16_t ID = 0;
+uint8_t lastkey;
 /* USER CODE END 0 */
 
 /**
@@ -117,19 +148,24 @@ int main(void)
   MX_USART2_UART_Init();
   MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
-
-  HAL_TIM_Base_Start(&htim1);
   HAL_GPIO_WritePin(TFT_LED_GPIO_Port, TFT_LED_Pin, 1);
+  HAL_TIM_Base_Start(&htim1);
   ID = readID();
   HAL_Delay(100);
   ds3231_setTime(&time);
   tft_init(ID);
-  setRotation(1);
+  setRotation(3);
+  fillScreen(BLACK);
   /* USER CODE END 2 */
 
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
   /* USER CODE END RTOS_MUTEX */
+
+  /* Create the semaphores(s) */
+  /* definition and creation of Ngat_Nhan_Tu_BP */
+  osSemaphoreDef(Ngat_Nhan_Tu_BP);
+  Ngat_Nhan_Tu_BPHandle = osSemaphoreCreate(osSemaphore(Ngat_Nhan_Tu_BP), 1);
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
   /* add semaphores, ... */
@@ -144,13 +180,29 @@ int main(void)
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
-  /* definition and creation of KeyMatrix_Task */
-  osThreadDef(KeyMatrix_Task, StartKeyMatrix_Task, osPriorityNormal, 0, 128);
-  KeyMatrix_TaskHandle = osThreadCreate(osThread(KeyMatrix_Task), NULL);
+  /* definition and creation of XuLy_Ban_Phim */
+  osThreadDef(XuLy_Ban_Phim, Start_XuLy_Ban_Phim, osPriorityHigh, 0, 128);
+  XuLy_Ban_PhimHandle = osThreadCreate(osThread(XuLy_Ban_Phim), NULL);
 
-  /* definition and creation of TFT_Task */
-  osThreadDef(TFT_Task, StartTFT_Task, osPriorityAboveNormal, 0, 128);
-  TFT_TaskHandle = osThreadCreate(osThread(TFT_Task), NULL);
+  /* definition and creation of XuLy_Lora */
+  osThreadDef(XuLy_Lora, Start_XuLy_Lora, osPriorityHigh, 0, 128);
+  XuLy_LoraHandle = osThreadCreate(osThread(XuLy_Lora), NULL);
+
+  /* definition and creation of XuLy_Cap_Nhat */
+  osThreadDef(XuLy_Cap_Nhat, Start_XuLy_UPD, osPriorityNormal, 0, 128);
+  XuLy_Cap_NhatHandle = osThreadCreate(osThread(XuLy_Cap_Nhat), NULL);
+
+  /* definition and creation of XuLy_MHC */
+  osThreadDef(XuLy_MHC, Start_XuLy_MHC, osPriorityLow, 0, 128);
+  XuLy_MHCHandle = osThreadCreate(osThread(XuLy_MHC), NULL);
+
+  /* definition and creation of XuLy_MHS */
+  osThreadDef(XuLy_MHS, Start_XuLy_MHS, osPriorityLow, 0, 128);
+  XuLy_MHSHandle = osThreadCreate(osThread(XuLy_MHS), NULL);
+
+  /* definition and creation of XuLy_MHL */
+  osThreadDef(XuLy_MHL, Start_XuLy_MHL, osPriorityLow, 0, 128);
+  XuLy_MHLHandle = osThreadCreate(osThread(XuLy_MHL), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -451,45 +503,119 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE END 4 */
 
-/* USER CODE BEGIN Header_StartKeyMatrix_Task */
+/* USER CODE BEGIN Header_Start_XuLy_Ban_Phim */
 /**
-  * @brief  Function implementing the KeyMatrix_Task thread.
+  * @brief  Function implementing the XuLy_Ban_Phim thread.
   * @param  argument: Not used
   * @retval None
   */
-/* USER CODE END Header_StartKeyMatrix_Task */
-void StartKeyMatrix_Task(void const * argument)
+/* USER CODE END Header_Start_XuLy_Ban_Phim */
+void Start_XuLy_Ban_Phim(void const * argument)
 {
   /* USER CODE BEGIN 5 */
   /* Infinite loop */
   for(;;)
   {
-	  osDelay(1);
+	  osSemaphoreWait(Ngat_Nhan_Tu_BPHandle, osWaitForever);
+	  lastkey = getkey(&hi2c1);
+	  fillScreen(BLACK);
+	  printnewtstr(10, RED, &mono9x7bold, 1, "");
+	  printnewtstr(50, RED, &mono9x7bold, 1, "Nut duoc nhan");
+	  printnewtstr(50, RED, &mono9x7bold, 1, "");
+	  fillScreen(BLACK);
   }
   /* USER CODE END 5 */
 }
 
-/* USER CODE BEGIN Header_StartTFT_Task */
+/* USER CODE BEGIN Header_Start_XuLy_Lora */
 /**
-* @brief Function implementing the TFT_Task thread.
+* @brief Function implementing the XuLy_Lora thread.
 * @param argument: Not used
 * @retval None
 */
-/* USER CODE END Header_StartTFT_Task */
-void StartTFT_Task(void const * argument)
+/* USER CODE END Header_Start_XuLy_Lora */
+void Start_XuLy_Lora(void const * argument)
 {
-  /* USER CODE BEGIN StartTFT_Task */
+  /* USER CODE BEGIN Start_XuLy_Lora */
   /* Infinite loop */
   for(;;)
   {
-	  //ds3231_getTime(&time);
-	  fillScreen(RED);
-	  fillScreen(BLUE);
-	  fillScreen(GREEN);
-	  //osDelay(1);
-
+    osDelay(1);
   }
-  /* USER CODE END StartTFT_Task */
+  /* USER CODE END Start_XuLy_Lora */
+}
+
+/* USER CODE BEGIN Header_Start_XuLy_UPD */
+/**
+* @brief Function implementing the XuLy_Cap_Nhat thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_Start_XuLy_UPD */
+void Start_XuLy_UPD(void const * argument)
+{
+  /* USER CODE BEGIN Start_XuLy_UPD */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END Start_XuLy_UPD */
+}
+
+/* USER CODE BEGIN Header_Start_XuLy_MHC */
+/**
+* @brief Function implementing the XuLy_MHC thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_Start_XuLy_MHC */
+void Start_XuLy_MHC(void const * argument)
+{
+  /* USER CODE BEGIN Start_XuLy_MHC */
+  /* Infinite loop */
+  for(;;)
+  {
+	printnewtstr(10,RED, &mono9x7bold, 1, "Dang chay task XuLy MHC");
+    osDelay(1);
+  }
+  /* USER CODE END Start_XuLy_MHC */
+}
+
+/* USER CODE BEGIN Header_Start_XuLy_MHS */
+/**
+* @brief Function implementing the XuLy_MHS thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_Start_XuLy_MHS */
+void Start_XuLy_MHS(void const * argument)
+{
+  /* USER CODE BEGIN Start_XuLy_MHS */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END Start_XuLy_MHS */
+}
+
+/* USER CODE BEGIN Header_Start_XuLy_MHL */
+/**
+* @brief Function implementing the XuLy_MHL thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_Start_XuLy_MHL */
+void Start_XuLy_MHL(void const * argument)
+{
+  /* USER CODE BEGIN Start_XuLy_MHL */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END Start_XuLy_MHL */
 }
 
 /**

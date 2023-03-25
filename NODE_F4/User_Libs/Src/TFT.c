@@ -166,6 +166,7 @@ uint8_t rotation  = 0;
 
 #define pgm_read_byte(addr) (*(const unsigned char *)(addr))
 #define pgm_read_word(addr) (*(const unsigned short *)(addr))
+#define pgm_read_pointer(addr) (*(const unsigned short *)(addr))
 
 #define min(a, b) (((a) < (b)) ? (a) : (b))
 #define _swap_int16_t(a, b) { int16_t t = a; a = b; b = t; }
@@ -3175,9 +3176,6 @@ void drawRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color)
 void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color)
 {
     int16_t end;
-#if defined(SUPPORT_9488_555)
-    if (is555) color = color565_to_555(color);
-#endif
     if (w < 0) {
         w = -w;
         x -= w;
@@ -3393,7 +3391,7 @@ void testLines(uint16_t color)
                   w = width(),
                   h = height();
 
-    fillScreen(BLACK);
+    //fillScreen(BLACK);
 
     x1 = y1 = 0;
     y2    = h - 1;
@@ -3401,7 +3399,7 @@ void testLines(uint16_t color)
     x2    = w - 1;
     for (y2 = 0; y2 < h; y2 += 6) drawLine(x1, y1, x2, y2, color);
 
-    fillScreen(BLACK);
+    //fillScreen(BLACK);
 
     x1    = w - 1;
     y1    = 0;
@@ -3410,7 +3408,7 @@ void testLines(uint16_t color)
     x2    = 0;
     for (y2 = 0; y2 < h; y2 += 6) drawLine(x1, y1, x2, y2, color);
 
-    fillScreen(BLACK);
+    //fillScreen(BLACK);
 
     x1    = 0;
     y1    = h - 1;
@@ -3419,7 +3417,7 @@ void testLines(uint16_t color)
     x2    = w - 1;
     for (y2 = 0; y2 < h; y2 += 6) drawLine(x1, y1, x2, y2, color);
 
-    fillScreen(BLACK);
+    //fillScreen(BLACK);
 
     x1    = w - 1;
     y1    = h - 1;

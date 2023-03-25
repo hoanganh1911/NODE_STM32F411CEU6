@@ -13,6 +13,5 @@
 /*----------------------------------------*/
 #define PCF_ADDR 0x20
 /*----------------------------------------*/
-uint8_t read(I2C_HandleTypeDef *_hi2c,uint8_t mask);
 uint8_t getkey(I2C_HandleTypeDef *_hi2c);
 #endif /* KEYPAD_PCF_H_ */

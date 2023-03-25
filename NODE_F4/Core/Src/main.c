@@ -80,24 +80,27 @@ void Start_XuLy_MHL(void const * argument);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-volatile bool keyChange = false;
 void delay_us (uint32_t time)
 {
 	__HAL_TIM_SET_COUNTER(&htim1, 0);
 	while ((__HAL_TIM_GET_COUNTER(&htim1))<time);
+}
+void delay_ms(uint32_t time)
+{
+	for(int i = 0;i<1000;i++)
+		delay_us(time);
 }
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
 	__disable_irq();
 	if(GPIO_Pin == PCF_INT_Pin)
 	{
-		delay_us(1);
+		delay_ms(10);
 		if(HAL_GPIO_ReadPin(PCF_INT_GPIO_Port, PCF_INT_Pin) == 0)
 		{
-			keyChange = true;
 			osSemaphoreRelease(Ngat_Nhan_Tu_BPHandle);
 		}
-
+		delay_ms(10);
 	}
 	__enable_irq();
 }
@@ -112,7 +115,10 @@ rtc_t time = {
 		  .hi2c		 = &hi2c1
 };
 uint16_t ID = 0;
-uint8_t lastkey;
+volatile uint8_t _lastkey;
+volatile bool _man_hinh_chinh 	= false;
+volatile bool _man_hinh_setting	= false;
+volatile bool _man_hinh_login	= false;
 /* USER CODE END 0 */
 
 /**
@@ -156,6 +162,7 @@ int main(void)
   tft_init(ID);
   setRotation(3);
   fillScreen(BLACK);
+  _man_hinh_chinh = true; // Bật màn hình chính lúc đầu
   /* USER CODE END 2 */
 
   /* USER CODE BEGIN RTOS_MUTEX */
@@ -517,12 +524,49 @@ void Start_XuLy_Ban_Phim(void const * argument)
   for(;;)
   {
 	  osSemaphoreWait(Ngat_Nhan_Tu_BPHandle, osWaitForever);
-	  lastkey = getkey(&hi2c1);
-	  fillScreen(BLACK);
-	  printnewtstr(10, RED, &mono9x7bold, 1, "");
-	  printnewtstr(50, RED, &mono9x7bold, 1, "Nut duoc nhan");
-	  printnewtstr(50, RED, &mono9x7bold, 1, "");
-	  fillScreen(BLACK);
+	  _lastkey = getkey(&hi2c1);
+	  if(_man_hinh_chinh == true)
+	  {
+		  // Không tắt màn hình luôn vì chưa chắc đã đúng nút cùng với đó là
+		  //tránh debounce xảy ra ngắt tiếp và chạy đên if tiếp theo
+		  if (_lastkey == 3)
+		  {
+			  fillScreen(BLACK);
+			  _man_hinh_login = true;
+			  _man_hinh_chinh = false;
+
+		  }
+		  else if (_lastkey == 7)
+		  {
+			  fillScreen(BLACK);
+			  _man_hinh_setting = true;
+			  _man_hinh_chinh = false;
+
+		  }
+
+	  }
+	  else if(_man_hinh_setting == true)
+	  {
+
+		  if(_lastkey == 11)
+		  {
+			  fillScreen(BLACK);
+			  _man_hinh_chinh = true;
+			  _man_hinh_setting = false;
+
+		  }
+	  }
+	  else if(_man_hinh_login == true)
+	  {
+
+		  if(_lastkey == 11)
+		  {
+			  fillScreen(BLACK);
+			  _man_hinh_chinh = true;
+			  _man_hinh_login = false;
+
+		  }
+	  }
   }
   /* USER CODE END 5 */
 }
@@ -576,7 +620,10 @@ void Start_XuLy_MHC(void const * argument)
   /* Infinite loop */
   for(;;)
   {
-	printnewtstr(10,RED, &mono9x7bold, 1, "Dang chay task XuLy MHC");
+	  if(_man_hinh_chinh)
+	  {
+		  printnewtstr(10,RED, &mono9x7bold, 1, "Dang chay task XuLy MHC");
+	  }
     osDelay(1);
   }
   /* USER CODE END Start_XuLy_MHC */
@@ -595,6 +642,10 @@ void Start_XuLy_MHS(void const * argument)
   /* Infinite loop */
   for(;;)
   {
+	  if(_man_hinh_setting)
+	  {
+		  printnewtstr(10,RED, &mono9x7bold, 1, "Dang chay task XuLy MHS");
+	  }
     osDelay(1);
   }
   /* USER CODE END Start_XuLy_MHS */
@@ -613,6 +664,10 @@ void Start_XuLy_MHL(void const * argument)
   /* Infinite loop */
   for(;;)
   {
+	  if(_man_hinh_login)
+	  {
+		  printnewtstr(10,RED, &mono9x7bold, 1, "Dang chay task XuLy MHL");
+	  }
     osDelay(1);
   }
   /* USER CODE END Start_XuLy_MHL */

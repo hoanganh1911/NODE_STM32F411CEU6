@@ -24,6 +24,9 @@
 /* USER CODE BEGIN Includes */
 #include "TFT.h"
 #include "DS3231.h"
+#include "../../lvgl/lvgl.h"
+#include "../../lvgl/examples/lv_examples.h"
+#include "lcd_lvgl.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -92,17 +95,15 @@ void delay_ms(uint32_t time)
 }
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-	__disable_irq();
 	if(GPIO_Pin == PCF_INT_Pin)
 	{
-		delay_ms(10);
+		delay_us(10);
 		if(HAL_GPIO_ReadPin(PCF_INT_GPIO_Port, PCF_INT_Pin) == 0)
 		{
 			osSemaphoreRelease(Ngat_Nhan_Tu_BPHandle);
 		}
-		delay_ms(10);
+		delay_us(10);
 	}
-	__enable_irq();
 }
 rtc_t time = {
 		  .DayOfWeek = THURSDAY,
@@ -116,6 +117,7 @@ rtc_t time = {
 };
 uint16_t ID = 0;
 volatile uint8_t _lastkey;
+bool _keypressed = false;
 volatile bool _man_hinh_chinh 	= false;
 volatile bool _man_hinh_setting	= false;
 volatile bool _man_hinh_login	= false;
@@ -156,12 +158,21 @@ int main(void)
   /* USER CODE BEGIN 2 */
   HAL_GPIO_WritePin(TFT_LED_GPIO_Port, TFT_LED_Pin, 1);
   HAL_TIM_Base_Start(&htim1);
-  ID = readID();
-  HAL_Delay(100);
-  ds3231_setTime(&time);
-  tft_init(ID);
-  setRotation(3);
-  fillScreen(BLACK);
+  lv_init();
+  Display_init(3);
+  HAL_Delay(500);
+  lv_example_anim_2();
+//  ID = readID();
+//  HAL_Delay(100);
+//  ds3231_setTime(&time);
+//  tft_init(ID);
+//  setRotation(3);
+//  testFillScreen();
+//  testLines(CYAN);
+//  testFastLines(RED, BLUE);
+//  testFilledCircles(10, MAGENTA);
+//  testCircles(10, WHITE);
+//  fillScreen(BLACK);
   _man_hinh_chinh = true; // Bật màn hình chính lúc đầu
   /* USER CODE END 2 */
 
@@ -525,47 +536,45 @@ void Start_XuLy_Ban_Phim(void const * argument)
   {
 	  osSemaphoreWait(Ngat_Nhan_Tu_BPHandle, osWaitForever);
 	  _lastkey = getkey(&hi2c1);
-	  if(_man_hinh_chinh == true)
+	  if(_lastkey != 17)
 	  {
-		  // Không tắt màn hình luôn vì chưa chắc đã đúng nút cùng với đó là
-		  //tránh debounce xảy ra ngắt tiếp và chạy đên if tiếp theo
-		  if (_lastkey == 3)
-		  {
-			  fillScreen(BLACK);
-			  _man_hinh_login = true;
-			  _man_hinh_chinh = false;
+		  if(_man_hinh_chinh == true)
+		  	  {
+		  		  if (_lastkey == 3)
+		  		  {
+		  			  _man_hinh_login = true;
+		  			  _man_hinh_chinh = false;
+		  		  }
+		  		  else if (_lastkey == 7)
+		  		  {
+		  			  _man_hinh_setting = true;
+		  			  _man_hinh_chinh = false;
+		  		  }
+		  	  }
+		  	  else if(_man_hinh_setting == true)
+		  	  {
+		  		  if(_lastkey == 11)
+		  		  {
+		  			  _man_hinh_chinh = true;
+		  			  _man_hinh_setting = false;
 
-		  }
-		  else if (_lastkey == 7)
-		  {
-			  fillScreen(BLACK);
-			  _man_hinh_setting = true;
-			  _man_hinh_chinh = false;
+		  		  }
+		  	  }
+		  	  else if(_man_hinh_login == true)
+		  	  {
 
-		  }
+		  		  if(_lastkey == 11)
+		  		  {
+		  			  _man_hinh_chinh = true;
+		  			  _man_hinh_login = false;
 
+		  		  }
+		  	  }
 	  }
-	  else if(_man_hinh_setting == true)
+	  else
 	  {
-
-		  if(_lastkey == 11)
-		  {
-			  fillScreen(BLACK);
-			  _man_hinh_chinh = true;
-			  _man_hinh_setting = false;
-
-		  }
-	  }
-	  else if(_man_hinh_login == true)
-	  {
-
-		  if(_lastkey == 11)
-		  {
-			  fillScreen(BLACK);
-			  _man_hinh_chinh = true;
-			  _man_hinh_login = false;
-
-		  }
+		  fillScreen(BLACK);
+		  _keypressed = true;
 	  }
   }
   /* USER CODE END 5 */
@@ -620,9 +629,11 @@ void Start_XuLy_MHC(void const * argument)
   /* Infinite loop */
   for(;;)
   {
-	  if(_man_hinh_chinh)
+	  if(_man_hinh_chinh ==  true && _man_hinh_login == false && _man_hinh_setting == false && _keypressed == true)
 	  {
+		  _keypressed == false;
 		  printnewtstr(10,RED, &mono9x7bold, 1, "Dang chay task XuLy MHC");
+
 	  }
     osDelay(1);
   }
@@ -642,8 +653,9 @@ void Start_XuLy_MHS(void const * argument)
   /* Infinite loop */
   for(;;)
   {
-	  if(_man_hinh_setting)
+	  if(_man_hinh_setting ==  true && _man_hinh_chinh ==  false && _man_hinh_login ==  false && _keypressed == true)
 	  {
+		  _keypressed == false;
 		  printnewtstr(10,RED, &mono9x7bold, 1, "Dang chay task XuLy MHS");
 	  }
     osDelay(1);
@@ -664,8 +676,9 @@ void Start_XuLy_MHL(void const * argument)
   /* Infinite loop */
   for(;;)
   {
-	  if(_man_hinh_login)
+	  if(_man_hinh_login == true && _man_hinh_chinh ==  false && _man_hinh_setting == false && _keypressed == true)
 	  {
+		  _keypressed == false;
 		  printnewtstr(10,RED, &mono9x7bold, 1, "Dang chay task XuLy MHL");
 	  }
     osDelay(1);
@@ -684,7 +697,8 @@ void Start_XuLy_MHL(void const * argument)
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
   /* USER CODE BEGIN Callback 0 */
-
+	lv_tick_inc(1);
+	osSystickHandler();
   /* USER CODE END Callback 0 */
   if (htim->Instance == TIM2) {
     HAL_IncTick();
@@ -693,7 +707,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
   /* USER CODE END Callback 1 */
 }
-
 /**
   * @brief  This function is executed in case of error occurrence.
   * @retval None

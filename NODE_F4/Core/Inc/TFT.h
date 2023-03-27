@@ -1,18 +1,7 @@
-/*
- * TFT.h
- *
- *  Created on: Mar 23, 2023
- *      Author: hoanganh
- */
-
-#ifndef INC_TFT_H_
-#define INC_TFT_H_
-
-/**
 
 /* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef __HX8347G_H
-#define __HX8347G_H
+#ifndef __TFT_H
+#define __TFT_H
 
 #ifdef __cplusplus
  extern "C" {
@@ -20,19 +9,21 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "stdint.h"
-#include "stdlib.h"
-#include "stm32f4xx_hal.h"
-#include "string.h"
-#include "Functions.h"
-#include "User_Setting.h"
-#include "Fonts.h"
 
-
+#define  WIDTH    ((uint16_t)240)
+#define  HEIGHT   ((uint16_t)400)
 
 #define true	1
 #define false	0
 
-
+#define	BLACK   0x0000
+#define	BLUE    0x001F
+#define	RED     0xF800
+#define	GREEN   0x07E0
+#define CYAN    0x07FF
+#define MAGENTA 0xF81F
+#define YELLOW  0xFFE0
+#define WHITE   0xFFFF
 
 
 #define MIPI_DCS_REV1   (1<<0)
@@ -53,39 +44,25 @@
 
 
 
-
 void tft_init(uint16_t ID);
+
 void reset(void);
+
 uint16_t readID(void);
 
 void setRotation(uint8_t r);
 void invertDisplay(uint8_t i);
-void vertScroll(int16_t top, int16_t scrollines, int16_t offset);
 
+void setAddrWindow(int16_t x, int16_t y, int16_t x1, int16_t y1);
 
+void pushColors16b(uint16_t * block, int16_t n, uint8_t first);
 
-void setFont(const GFXfont *f);
+void fillFB(int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint16_t *color);
 
-void setTextWrap(uint8_t w);
-
-void setTextColor (uint16_t color);
-
-void setTextSize (uint8_t size);
-
-void setCursor(int16_t x, int16_t y);
-
-void printnewtstr (int row, uint16_t txtcolor, const GFXfont *f, uint8_t txtsize, uint8_t *str);
-
-void printstr (uint8_t *str);
-
-
+void fillScreen(uint16_t color);
 
 #ifdef __cplusplus
 }
 #endif
 
 #endif /* __HX8347G_H */
-
-
-
-#endif /* INC_TFT_H_ */

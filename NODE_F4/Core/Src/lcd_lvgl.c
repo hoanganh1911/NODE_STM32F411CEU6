@@ -98,7 +98,7 @@ static void tft_flush(lv_disp_drv_t * drv, const lv_area_t * area, lv_color_t * 
         }
 
         indx = 0;
-        fill(area->x1, y, area->x2, y, DISP_fb);
+        fillFB(area->x1, y, area->x2, y, DISP_fb);
 
     }
 

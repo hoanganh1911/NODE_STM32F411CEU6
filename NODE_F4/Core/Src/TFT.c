@@ -1,12 +1,22 @@
-/*
- * TFT.c
- *
- *  Created on: Mar 23, 2023
- *      Author: hoanganh
- */
 
 /* Includes ------------------------------------------------------------------*/
 #include "TFT.h"
+#include "stm32f4xx_hal.h"
+#include "string.h"
+#include "User_Setting.h"
+#include "stdlib.h"
+
+
+
+void lcd_delay (uint16_t t)
+{
+	for (int i=0; i< t*100; i++)
+	{
+		__asm ("nop");
+	}
+}
+
+
 
 /********************************************** NO CHNAGES AFTER THIS ************************************************/
 
@@ -38,53 +48,56 @@ void PIN_OUTPUT (GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin)
 	  GPIO_InitStruct.Pin = GPIO_Pin;
 	  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
 	  GPIO_InitStruct.Pull = GPIO_NOPULL;
-	  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+	  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
 	  HAL_GPIO_Init(GPIOx, &GPIO_InitStruct);
 }
 
 
- #define RD_ACTIVE  	PIN_LOW(RD_PORT, RD_PIN)
- #define RD_IDLE    	PIN_HIGH(RD_PORT, RD_PIN)
- #define RD_OUTPUT  	PIN_OUTPUT(RD_PORT, RD_PIN)
- #define WR_ACTIVE  	PIN_LOW(WR_PORT, WR_PIN)
- #define WR_IDLE    	PIN_HIGH(WR_PORT, WR_PIN)
- #define WR_OUTPUT  	PIN_OUTPUT(WR_PORT, WR_PIN)
- #define CD_COMMAND 	PIN_LOW(CD_PORT, CD_PIN)
- #define CD_DATA    	PIN_HIGH(CD_PORT, CD_PIN)
- #define CD_OUTPUT  	PIN_OUTPUT(CD_PORT, CD_PIN)
- #define CS_ACTIVE  	PIN_LOW(CS_PORT, CS_PIN)
- #define CS_IDLE    	PIN_HIGH(CS_PORT, CS_PIN)
- #define CS_OUTPUT  	PIN_OUTPUT(CS_PORT, CS_PIN)
- #define RESET_ACTIVE  	PIN_LOW(RESET_PORT, RESET_PIN)
- #define RESET_IDLE    	PIN_HIGH(RESET_PORT, RESET_PIN)
- #define RESET_OUTPUT  	PIN_OUTPUT(RESET_PORT, RESET_PIN)
 
 
 
-#define WR_ACTIVE2  	{WR_ACTIVE; WR_ACTIVE;}
-#define WR_ACTIVE4  	{WR_ACTIVE2; WR_ACTIVE2;}
-#define WR_ACTIVE8 	 	{WR_ACTIVE4; WR_ACTIVE4;}
-#define RD_ACTIVE2  	{RD_ACTIVE; RD_ACTIVE;}
-#define RD_ACTIVE4  	{RD_ACTIVE2; RD_ACTIVE2;}
-#define RD_ACTIVE8  	{RD_ACTIVE4; RD_ACTIVE4;}
-#define RD_ACTIVE16 	{RD_ACTIVE8; RD_ACTIVE8;}
-#define WR_IDLE2  		{WR_IDLE; WR_IDLE;}
-#define WR_IDLE4  		{WR_IDLE2; WR_IDLE2;}
-#define RD_IDLE2  		{RD_IDLE; RD_IDLE;}
-#define RD_IDLE4  		{RD_IDLE2; RD_IDLE2;}
+ #define RD_ACTIVE  PIN_LOW(RD_PORT, RD_PIN)
+ #define RD_IDLE    PIN_HIGH(RD_PORT, RD_PIN)
+ #define RD_OUTPUT  PIN_OUTPUT(RD_PORT, RD_PIN)
+ #define WR_ACTIVE  PIN_LOW(WR_PORT, WR_PIN)
+ #define WR_IDLE    PIN_HIGH(WR_PORT, WR_PIN)
+ #define WR_OUTPUT  PIN_OUTPUT(WR_PORT, WR_PIN)
+ #define CD_COMMAND PIN_LOW(CD_PORT, CD_PIN)
+ #define CD_DATA    PIN_HIGH(CD_PORT, CD_PIN)
+ #define CD_OUTPUT  PIN_OUTPUT(CD_PORT, CD_PIN)
+ #define CS_ACTIVE  PIN_LOW(CS_PORT, CS_PIN)
+ #define CS_IDLE    PIN_HIGH(CS_PORT, CS_PIN)
+ #define CS_OUTPUT  PIN_OUTPUT(CS_PORT, CS_PIN)
+ #define RESET_ACTIVE  PIN_LOW(RESET_PORT, RESET_PIN)
+ #define RESET_IDLE    PIN_HIGH(RESET_PORT, RESET_PIN)
+ #define RESET_OUTPUT  PIN_OUTPUT(RESET_PORT, RESET_PIN)
 
-#define WR_STROBE		{WR_ACTIVE; WR_IDLE;}         //PWLW=TWRL=50ns
-#define RD_STROBE 		{RD_IDLE; RD_ACTIVE; RD_ACTIVE; RD_ACTIVE;}   //PWLR=TRDL=150ns
 
 
-#define write8(x)     { write_8(x); WR_STROBE; }
+#define WR_ACTIVE2  {WR_ACTIVE; WR_ACTIVE;}
+#define WR_ACTIVE4  {WR_ACTIVE2; WR_ACTIVE2;}
+#define WR_ACTIVE8  {WR_ACTIVE4; WR_ACTIVE4;}
+#define RD_ACTIVE2  {RD_ACTIVE; RD_ACTIVE;}
+#define RD_ACTIVE4  {RD_ACTIVE2; RD_ACTIVE2;}
+#define RD_ACTIVE8  {RD_ACTIVE4; RD_ACTIVE4;}
+#define RD_ACTIVE16 {RD_ACTIVE8; RD_ACTIVE8;}
+#define WR_IDLE2  {WR_IDLE; WR_IDLE;}
+#define WR_IDLE4  {WR_IDLE2; WR_IDLE2;}
+#define RD_IDLE2  {RD_IDLE; RD_IDLE;}
+#define RD_IDLE4  {RD_IDLE2; RD_IDLE2;}
+
+#define WR_STROBE { WR_ACTIVE; WR_IDLE; }         //PWLW=TWRL=50ns
+#define RD_STROBE RD_IDLE, RD_ACTIVE, RD_ACTIVE, RD_ACTIVE   //PWLR=TRDL=150ns
+
+
+#define write8(x)     { write_8(x); WRITE_DELAY; WR_STROBE; WR_IDLE; }
 #define write16(x)    { uint8_t h = (x)>>8, l = x; write8(h); write8(l); }
 #define READ_8(dst)   { RD_STROBE; READ_DELAY; dst = read_8(); RD_IDLE; RD_IDLE; } // read 250ns after RD_ACTIVE goes low
 #define READ_16(dst)  { uint8_t hi; READ_8(hi); READ_8(dst); dst |= (hi << 8); }
 
-#define CTL_INIT()   	{ RD_OUTPUT; WR_OUTPUT; CD_OUTPUT; CS_OUTPUT; RESET_OUTPUT; }
-#define WriteCmd(x)  	{ CD_COMMAND; write16(x); CD_DATA; }
-#define WriteData(x) 	{ write16(x); }
+#define CTL_INIT()   { RD_OUTPUT; WR_OUTPUT; CD_OUTPUT; CS_OUTPUT; RESET_OUTPUT; }
+#define WriteCmd(x)  { CD_COMMAND; write16(x); CD_DATA; }
+#define WriteData(x) { write16(x); }
 #define SUPPORT_9488_555          //costs +230 bytes, 0.03s / 0.19s
 #define SUPPORT_B509_7793         //R61509, ST7793 +244 bytes
 #define OFFSET_9327 32            //costs about 103 bytes, 0.08s
@@ -102,18 +115,11 @@ uint16_t width(void)
 uint16_t height(void)
 { return _height; }
 
-void pushColors16b(uint16_t * block, int16_t n, uint8_t first);
-void pushColors8b(uint8_t * block, int16_t n, uint8_t first);
-void pushColors4n(const uint8_t * block, int16_t n, uint8_t first, uint8_t bigend);
-void drawFastVLine(int16_t x, int16_t y, int16_t h, uint16_t color);
-void drawFastHLine(int16_t x, int16_t y, int16_t w, uint16_t color);
-
-void setAddrWindow(int16_t x, int16_t y, int16_t x1, int16_t y1);
 int16_t readGRAM(int16_t x, int16_t y, uint16_t * block, int16_t w, int16_t h);
 
 void setReadDir (void);
 void setWriteDir (void);
-static uint8_t done_reset=0, is8347, is555, is9797;
+static uint8_t done_reset, is8347, is555, is9797;
 static uint16_t color565_to_555(uint16_t color) {
     return (color & 0xFFC0) | ((color & 0x1F) << 1) | ((color & 0x01));  //lose Green LSB, extend Blue LSB
 }
@@ -133,7 +139,6 @@ static uint8_t color565_to_b(uint16_t color) {
 uint16_t color565(uint8_t r, uint8_t g, uint8_t b) { return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | ((b & 0xF8) >> 3); }
 uint16_t readPixel(int16_t x, int16_t y) { uint16_t color; readGRAM(x, y, &color, 1, 1); return color; }
 
-static void pushColors_any(uint16_t cmd, uint8_t * block, int16_t n, uint8_t first, uint8_t flags);
 
 static void write24(uint16_t color);
 
@@ -151,6 +156,8 @@ void pushCommand(uint16_t cmd, uint8_t * block, int8_t N) { WriteCmdParamN(cmd, 
 
 static uint16_t read16bits(void);
 
+static void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color);
+
 uint16_t readReg(uint16_t reg, int8_t index);
 
 uint32_t readReg32(uint16_t reg);
@@ -166,7 +173,7 @@ uint8_t rotation  = 0;
 
 #define pgm_read_byte(addr) (*(const unsigned char *)(addr))
 #define pgm_read_word(addr) (*(const unsigned short *)(addr))
-#define pgm_read_pointer(addr) (*(const unsigned short *)(addr))
+#define pgm_read_pointer(addr) ((void *)pgm_read_word(addr))
 
 #define min(a, b) (((a) < (b)) ? (a) : (b))
 #define _swap_int16_t(a, b) { int16_t t = a; a = b; b = t; }
@@ -175,28 +182,16 @@ uint16_t  _lcd_xor, _lcd_capable;
 
 uint16_t _lcd_ID, _lcd_rev, _lcd_madctl, _lcd_drivOut, _MC, _MP, _MW, _SC, _EC, _SP, _EP;
 
-
-
-extern TIM_HandleTypeDef htim1;
-void delay (uint32_t time)
-{
-	__HAL_TIM_SET_COUNTER(&htim1, 0);
-	while ((__HAL_TIM_GET_COUNTER(&htim1))<time);
-}
-
-
-//extern GFXfont *gfxFont;
-
 void setReadDir (void)
 {
 	PIN_INPUT(GPIOA, D0_PIN);
 	PIN_INPUT(GPIOA, D1_PIN);
 	PIN_INPUT(GPIOA, D2_PIN);
 	PIN_INPUT(GPIOA, D3_PIN);
-	PIN_INPUT(GPIOB, D4_PIN);
-	PIN_INPUT(GPIOB, D5_PIN);
-	PIN_INPUT(GPIOB, D6_PIN);
-	PIN_INPUT(GPIOB, D7_PIN);
+	PIN_INPUT(GPIOA, D4_PIN);
+	PIN_INPUT(GPIOA, D5_PIN);
+	PIN_INPUT(GPIOA, D6_PIN);
+	PIN_INPUT(GPIOA, D7_PIN);
 }
 
 void setWriteDir (void)
@@ -205,54 +200,14 @@ void setWriteDir (void)
 	PIN_OUTPUT(GPIOA, D1_PIN);
 	PIN_OUTPUT(GPIOA, D2_PIN);
 	PIN_OUTPUT(GPIOA, D3_PIN);
-	PIN_OUTPUT(GPIOB, D4_PIN);
-	PIN_OUTPUT(GPIOB, D5_PIN);
-	PIN_OUTPUT(GPIOB, D6_PIN);
-	PIN_OUTPUT(GPIOB, D7_PIN);
+	PIN_OUTPUT(GPIOA, D4_PIN);
+	PIN_OUTPUT(GPIOA, D5_PIN);
+	PIN_OUTPUT(GPIOA, D6_PIN);
+	PIN_OUTPUT(GPIOA, D7_PIN);
 }
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-
-
-static void pushColors_any(uint16_t cmd, uint8_t * block, int16_t n, uint8_t first, uint8_t flags)
-{
-    uint16_t color;
-    uint8_t h, l;
-	uint8_t isconst = flags & 1;
-	uint8_t isbigend = (flags & 2) != 0;
-    CS_ACTIVE;
-    if (first) {
-        WriteCmd(cmd);
-    }
-
-    if (!isconst && !isbigend) {
-        uint16_t *block16 = (uint16_t*)block;
-        while (n-- > 0) {
-            color = *block16++;
-            write16(color);
-        }
-    } else
-
-    while (n-- > 0) {
-        if (isconst) {
-            h = pgm_read_byte(block++);
-            l = pgm_read_byte(block++);
-        } else {
-		    h = (*block++);
-            l = (*block++);
-		}
-        color = (isbigend) ? (h << 8 | l) :  (l << 8 | h);
-#if defined(SUPPORT_9488_555)
-        if (is555) color = color565_to_555(color);
-#endif
-        if (is9797) write24(color); else
-        write16(color);
-    }
-    CS_IDLE;
-}
 
 static void write24(uint16_t color)
 {
@@ -310,7 +265,7 @@ static void init_table(const void *table, int16_t size)
         uint8_t len = pgm_read_byte(p++);
         if (cmd == TFTLCD_DELAY8)
         {
-            delay(len);
+            lcd_delay(len);
             len = 0;
         }
         else
@@ -331,7 +286,7 @@ static void init_table16(const void *table, int16_t size)
         uint16_t cmd = pgm_read_word(p++);
         uint16_t d = pgm_read_word(p++);
         if (cmd == TFTLCD_DELAY)
-            delay(d);
+            lcd_delay(d);
         else {
 			writecmddata(cmd, d);                      //static function
         }
@@ -350,11 +305,11 @@ void reset(void)
     RD_IDLE;
     WR_IDLE;
     RESET_IDLE;
-    delay(50);
+    lcd_delay(50);
     RESET_ACTIVE;
-    delay(100);
+    lcd_delay(100);
     RESET_IDLE;
-    delay(100);
+    lcd_delay(100);
 	WriteCmdData(0xB0, 0x0000);   //R61520 needs this to read ID
 }
 
@@ -376,7 +331,7 @@ uint16_t readReg(uint16_t reg, int8_t index)
     CS_ACTIVE;
     WriteCmd(reg);
     setReadDir();
-    delay(1);    //1us should be adequate
+    lcd_delay(1);    //1us should be adequate
     //    READ_16(ret);
     do { ret = read16bits(); }while (--index >= 0);  //need to test with SSD1963
     RD_IDLE;
@@ -400,13 +355,607 @@ uint32_t readReg40(uint16_t reg)
     return ((uint32_t) h << 24) | (m << 8) | (l >> 8);
 }
 
+uint16_t readID(void)
+{
+    uint16_t ret, ret2;
+    uint8_t msb;
+    ret = readReg(0,0);           //forces a reset() if called before begin()
+    if (ret == 0x5408)          //the SPFD5408 fails the 0xD3D3 test.
+        return 0x5408;
+    if (ret == 0x5420)          //the SPFD5420 fails the 0xD3D3 test.
+        return 0x5420;
+    if (ret == 0x8989)          //SSD1289 is always 8989
+        return 0x1289;
+    ret = readReg(0x67,0);        //HX8347-A
+    if (ret == 0x4747)
+        return 0x8347;
+    ret = readReg40(0xEF);      //ILI9327: [xx 02 04 93 27 FF]
+    if (ret == 0x9327)
+        return 0x9327;
+//#if defined(SUPPORT_1963) && USING_16BIT_BUS
+    ret = readReg32(0xA1);      //SSD1963: [01 57 61 01]
+    if (ret == 0x6101)
+        return 0x1963;
+    if (ret == 0xFFFF)          //R61526: [xx FF FF FF]
+        return 0x1526;          //subsequent begin() enables Command Access
+    if (ret == 0xFF00)          //R61520: [xx FF FF 00]
+        return 0x1520;          //subsequent begin() enables Command Access
+    if (ret == 0xF000)          //S6D05A1: [xx F0 F0 00]
+        return 0x05A1;          //subsequent begin() enables Command Access
+//#endif
+	ret = readReg40(0xBF);
+	if (ret == 0x8357)          //HX8357B: [xx 01 62 83 57 FF]
+        return 0x8357;
+	if (ret == 0x9481)          //ILI9481: [xx 02 04 94 81 FF]
+        return 0x9481;
+    if (ret == 0x1511)          //?R61511: [xx 02 04 15 11] not tested yet
+        return 0x1511;
+    if (ret == 0x1520)          //?R61520: [xx 01 22 15 20]
+        return 0x1520;
+    if (ret == 0x1526)          //?R61526: [xx 01 22 15 26]
+        return 0x1526;
+    if (ret == 0x1581)          //R61581:  [xx 01 22 15 81]
+        return 0x1581;
+    if (ret == 0x1400)          //?RM68140:[xx FF 68 14 00] not tested yet
+        return 0x6814;
+    ret = readReg32(0xD4);
+    if (ret == 0x5310)          //NT35310: [xx 01 53 10]
+        return 0x5310;
+    ret = readReg32(0xD7);
+    if (ret == 0x8031)          //weird unknown from BangGood [xx 20 80 31] PrinceCharles
+        return 0x8031;
+    ret = readReg32(0xFE) >> 8; //weird unknown from BangGood [04 20 53]
+    if (ret == 0x2053)
+        return 0x2053;
+    uint32_t ret32 = readReg32(0x04);
+    msb = ret32 >> 16;
+    ret = ret32;
+    if (msb == 0xE3 && ret == 0x0000) return 0xE300; //reg(04) = [xx E3 00 00] BangGood
+//    if (msb == 0x38 && ret == 0x8000) //unknown [xx 38 80 00] with D3 = 0x1602
+    if (msb == 0x00 && ret == 0x8000) { //HX8357-D [xx 00 80 00]
+#if 1
+        uint8_t cmds[] = {0xFF, 0x83, 0x57};
+        pushCommand(0xB9, cmds, 3);
+        msb = readReg(0xD0,0);
+        if (msb == 0x99) return 0x0099; //HX8357-D from datasheet
+        if (msb == 0x90)        //HX8357-C undocumented
+#endif
+            return 0x9090;      //BIG CHANGE: HX8357-D was 0x8357
+    }
+//    if (msb == 0xFF && ret == 0xFFFF) //R61526 [xx FF FF FF]
+//        return 0x1526;          //subsequent begin() enables Command Access
+    if (ret == 0x1526)          //R61526 [xx 06 15 26] if I have written NVM
+        {return 0x1526;}          //subsequent begin() enables Command Access
+	if (ret == 0x89F0)          //ST7735S: [xx 7C 89 F0]
+        return 0x7735;
+	if (ret == 0x8552)          //ST7789V: [xx 85 85 52]
+        return 0x7789;
+    if (ret == 0xAC11)          //?unknown [xx 61 AC 11]
+        return 0xAC11;
+    ret32 = readReg32(0xD3);      //[xx 91 63 00]
+    ret = ret32 >> 8;
+    if (ret == 0x9163) return ret;
+    ret = readReg32(0xD3);      //for ILI9488, 9486, 9340, 9341
+    if (ret == 0x3229) return ret;
+    msb = ret >> 8;
+    if (msb == 0x93 || msb == 0x94 || msb == 0x98 || msb == 0x77 || msb == 0x16)
+        return ret;             //0x9488, 9486, 9340, 9341, 7796
+    if (ret == 0x00D3 || ret == 0xD3D3)
+        return ret;             //16-bit write-only bus
+/*
+	msb = 0x12;                 //read 3rd,4th byte.  does not work in parallel
+	pushCommand(0xD9, &msb, 1);
+	ret2 = readReg(0xD3);
+    msb = 0x13;
+	pushCommand(0xD9, &msb, 1);
+	ret = (ret2 << 8) | readReg(0xD3);
+//	if (ret2 == 0x93)
+    	return ret2;
+*/
+	return readReg(0,0);          //0154, 7783, 9320, 9325, 9335, B505, B509
+}
+
+// independent cursor and window registers.   S6D0154, ST7781 increments.  ILI92320/5 do not.
+int16_t readGRAM(int16_t x, int16_t y, uint16_t * block, int16_t w, int16_t h)
+{
+    uint16_t ret, dummy, _MR = _MW;
+    int16_t n = w * h, row = 0, col = 0;
+    uint8_t r, g, b, tmp;
+    if (!is8347 && _lcd_capable & MIPI_DCS_REV1) // HX8347 uses same register
+        _MR = 0x2E;
+    if (_lcd_ID == 0x1602) _MR = 0x2E;
+    setAddrWindow(x, y, x + w - 1, y + h - 1);
+    while (n > 0) {
+        if (!(_lcd_capable & MIPI_DCS_REV1)) {
+            WriteCmdData(_MC, x + col);
+            WriteCmdData(_MP, y + row);
+        }
+        CS_ACTIVE;
+        WriteCmd(_MR);
+        setReadDir();
+        if (_lcd_capable & READ_NODUMMY) {
+            ;
+        } else if ((_lcd_capable & MIPI_DCS_REV1) || _lcd_ID == 0x1289) {
+            READ_8(r);
+        } else {
+            READ_16(dummy);
+        }
+		if (_lcd_ID == 0x1511) READ_8(r);   //extra dummy for R61511
+        while (n) {
+            if (_lcd_capable & READ_24BITS) {
+                READ_8(r);
+                READ_8(g);
+                READ_8(b);
+                if (_lcd_capable & READ_BGR)
+                    ret = color565(b, g, r);
+                else
+                    ret = color565(r, g, b);
+            } else {
+                READ_16(ret);
+                if (_lcd_capable & READ_LOWHIGH)
+                    ret = (ret >> 8) | (ret << 8);
+                if (_lcd_capable & READ_BGR)
+                    ret = (ret & 0x07E0) | (ret >> 11) | (ret << 11);
+            }
+#if defined(SUPPORT_9488_555)
+    if (is555) ret = color555_to_565(ret);
+#endif
+            *block++ = ret;
+            n--;
+            if (!(_lcd_capable & AUTO_READINC))
+                break;
+        }
+        if (++col >= w) {
+            col = 0;
+            if (++row >= h)
+                row = 0;
+        }
+        RD_IDLE;
+        CS_IDLE;
+        setWriteDir();
+    }
+    if (!(_lcd_capable & MIPI_DCS_REV1))
+        setAddrWindow(0, 0, width() - 1, height() - 1);
+    return 0;
+}
+
+void setRotation(uint8_t r)
+{
+    uint16_t GS, SS_v, ORG, REV = _lcd_rev;
+    uint8_t val, d[3];
+    rotation = r & 3;           // just perform the operation ourselves on the protected variables
+    _width = (rotation & 1) ? HEIGHT : WIDTH;
+    _height = (rotation & 1) ? WIDTH : HEIGHT;
+    switch (rotation) {
+    case 0:                    //PORTRAIT:
+        val = 0x48;             //MY=0, MX=1, MV=0, ML=0, BGR=1
+        break;
+    case 1:                    //LANDSCAPE: 90 degrees
+        val = 0x28;             //MY=0, MX=0, MV=1, ML=0, BGR=1
+        break;
+    case 2:                    //PORTRAIT_REV: 180 degrees
+        val = 0x98;             //MY=1, MX=0, MV=0, ML=1, BGR=1
+        break;
+    case 3:                    //LANDSCAPE_REV: 270 degrees
+        val = 0xF8;             //MY=1, MX=1, MV=1, ML=1, BGR=1
+        break;
+    }
+    if (_lcd_capable & INVERT_GS)
+        val ^= 0x80;
+    if (_lcd_capable & INVERT_SS)
+        val ^= 0x40;
+    if (_lcd_capable & INVERT_RGB)
+        val ^= 0x08;
+    if (_lcd_capable & MIPI_DCS_REV1) {
+        if (_lcd_ID == 0x6814) {  //.kbv my weird 0x9486 might be 68140
+            GS = (val & 0x80) ? (1 << 6) : 0;   //MY
+            SS_v = (val & 0x40) ? (1 << 5) : 0;   //MX
+            val &= 0x28;        //keep MV, BGR, MY=0, MX=0, ML=0
+            d[0] = 0;
+            d[1] = GS | SS_v | 0x02;      //MY, MX
+            d[2] = 0x3B;
+            WriteCmdParamN(0xB6, 3, d);
+            goto common_MC;
+        } else if (_lcd_ID == 0x1963 || _lcd_ID == 0x9481 || _lcd_ID == 0x1511) {
+            if (val & 0x80)
+                val |= 0x01;    //GS
+            if ((val & 0x40))
+                val |= 0x02;    //SS
+            if (_lcd_ID == 0x1963) val &= ~0xC0;
+            if (_lcd_ID == 0x9481) val &= ~0xD0;
+            if (_lcd_ID == 0x1511) {
+                val &= ~0x10;   //remove ML
+                val |= 0xC0;    //force penguin 180 rotation
+            }
+//            val &= (_lcd_ID == 0x1963) ? ~0xC0 : ~0xD0; //MY=0, MX=0 with ML=0 for ILI9481
+            goto common_MC;
+        } else if (is8347) {
+            _MC = 0x02, _MP = 0x06, _MW = 0x22, _SC = 0x02, _EC = 0x04, _SP = 0x06, _EP = 0x08;
+            if (_lcd_ID == 0x0065) {             //HX8352-B
+                val |= 0x01;    //GS=1
+                if ((val & 0x10)) val ^= 0xD3;  //(ML) flip MY, MX, ML, SS, GS
+                if (r & 1) _MC = 0x82, _MP = 0x80;
+                else _MC = 0x80, _MP = 0x82;
+            }
+            if (_lcd_ID == 0x5252) {             //HX8352-A
+                val |= 0x02;   //VERT_SCROLLON
+                if ((val & 0x10)) val ^= 0xD4;  //(ML) flip MY, MX, SS. GS=1
+            }
+			goto common_BGR;
+        }
+      common_MC:
+        _MC = 0x2A, _MP = 0x2B, _MW = 0x2C, _SC = 0x2A, _EC = 0x2A, _SP = 0x2B, _EP = 0x2B;
+      common_BGR:
+        WriteCmdParamN(is8347 ? 0x16 : 0x36, 1, &val);
+        _lcd_madctl = val;
+//	    if (_lcd_ID	== 0x1963) WriteCmdParamN(0x13, 0, NULL);   //NORMAL mode
+    }
+    // cope with 9320 variants
+    else {
+        switch (_lcd_ID) {
+#if defined(SUPPORT_9225)
+        case 0x9225:
+            _SC = 0x37, _EC = 0x36, _SP = 0x39, _EP = 0x38;
+            _MC = 0x20, _MP = 0x21, _MW = 0x22;
+            GS = (val & 0x80) ? (1 << 9) : 0;
+            SS_v = (val & 0x40) ? (1 << 8) : 0;
+            WriteCmdData(0x01, GS | SS_v | 0x001C);       // set Driver Output Control
+            goto common_ORG;
+#endif
+#if defined(SUPPORT_0139) || defined(SUPPORT_0154)
+#ifdef SUPPORT_0139
+        case 0x0139:
+            _SC = 0x46, _EC = 0x46, _SP = 0x48, _EP = 0x47;
+            goto common_S6D;
+#endif
+#ifdef SUPPORT_0154
+        case 0x0154:
+            _SC = 0x37, _EC = 0x36, _SP = 0x39, _EP = 0x38;
+            goto common_S6D;
+#endif
+          common_S6D:
+            _MC = 0x20, _MP = 0x21, _MW = 0x22;
+            GS = (val & 0x80) ? (1 << 9) : 0;
+            SS_v = (val & 0x40) ? (1 << 8) : 0;
+            // S6D0139 requires NL = 0x27,  S6D0154 NL = 0x28
+            WriteCmdData(0x01, GS | SS_v | ((_lcd_ID == 0x0139) ? 0x27 : 0x28));
+            goto common_ORG;
+#endif
+        case 0x5420:
+        case 0x7793:
+        case 0x9326:
+		case 0xB509:
+            _MC = 0x200, _MP = 0x201, _MW = 0x202, _SC = 0x210, _EC = 0x211, _SP = 0x212, _EP = 0x213;
+            GS = (val & 0x80) ? (1 << 15) : 0;
+			uint16_t NL;
+			NL = ((432 / 8) - 1) << 9;
+            if (_lcd_ID == 0x9326 || _lcd_ID == 0x5420) NL >>= 1;
+            WriteCmdData(0x400, GS | NL);
+            goto common_SS;
+        default:
+            _MC = 0x20, _MP = 0x21, _MW = 0x22, _SC = 0x50, _EC = 0x51, _SP = 0x52, _EP = 0x53;
+            GS = (val & 0x80) ? (1 << 15) : 0;
+            WriteCmdData(0x60, GS | 0x2700);    // Gate Scan Line (0xA700)
+          common_SS:
+            SS_v = (val & 0x40) ? (1 << 8) : 0;
+            WriteCmdData(0x01, SS_v);     // set Driver Output Control
+          common_ORG:
+            ORG = (val & 0x20) ? (1 << 3) : 0;
+#ifdef SUPPORT_8230
+            if (_lcd_ID == 0x8230) {    // UC8230 has strange BGR and READ_BGR behaviour
+                if (rotation == 1 || rotation == 2) {
+                    val ^= 0x08;        // change BGR bit for LANDSCAPE and PORTRAIT_REV
+                }
+            }
+#endif
+            if (val & 0x08)
+                ORG |= 0x1000;  //BGR
+            _lcd_madctl = ORG | 0x0030;
+            WriteCmdData(0x03, _lcd_madctl);    // set GRAM write direction and BGR=1.
+            break;
+#ifdef SUPPORT_1289
+        case 0x1289:
+            _MC = 0x4E, _MP = 0x4F, _MW = 0x22, _SC = 0x44, _EC = 0x44, _SP = 0x45, _EP = 0x46;
+            if (rotation & 1)
+                val ^= 0xD0;    // exchange Landscape modes
+            GS = (val & 0x80) ? (1 << 14) : 0;    //called TB (top-bottom), CAD=0
+            SS_v = (val & 0x40) ? (1 << 9) : 0;   //called RL (right-left)
+            ORG = (val & 0x20) ? (1 << 3) : 0;  //called AM
+            _lcd_drivOut = GS | SS_v | (REV << 13) | 0x013F;      //REV=0, BGR=0, MUX=319
+            if (val & 0x08)
+                _lcd_drivOut |= 0x0800; //BGR
+            WriteCmdData(0x01, _lcd_drivOut);   // set Driver Output Control
+            if (is9797) WriteCmdData(0x11, ORG | 0x4C30); else  // DFM=2, DEN=1, WM=1, TY=0
+            WriteCmdData(0x11, ORG | 0x6070);   // DFM=3, EN=0, TY=1
+            break;
+#endif
+		}
+    }
+    if ((rotation & 1) && ((_lcd_capable & MV_AXIS) == 0)) {
+        uint16_t x;
+        x = _MC, _MC = _MP, _MP = x;
+        x = _SC, _SC = _SP, _SP = x;    //.kbv check 0139
+        x = _EC, _EC = _EP, _EP = x;    //.kbv check 0139
+    }
+    setAddrWindow(0, 0, width() - 1, height() - 1);
+//    vertScroll(0, HEIGHT, 0);   //reset scrolling after a rotation
+}
+
+void drawPixel(int16_t x, int16_t y, uint16_t color)
+{
+    // MCUFRIEND just plots at edge if you try to write outside of the box:
+    if (x < 0 || y < 0 || x >= width() || y >= height())
+        return;
+#if defined(SUPPORT_9488_555)
+    if (is555) color = color565_to_555(color);
+#endif
+    setAddrWindow(x, y, x, y);
+//    CS_ACTIVE; WriteCmd(_MW); write16(color); CS_IDLE; //-0.01s +98B
+    if (is9797) { CS_ACTIVE; WriteCmd(_MW); write24(color); CS_IDLE;} else
+    WriteCmdData(_MW, color);
+}
+
+void setAddrWindow(int16_t x, int16_t y, int16_t x1, int16_t y1)
+{
+#if defined(OFFSET_9327)
+	if (_lcd_ID == 0x9327) {
+	    if (rotation == 2) y += OFFSET_9327, y1 += OFFSET_9327;
+	    if (rotation == 3) x += OFFSET_9327, x1 += OFFSET_9327;
+    }
+#endif
+#if 1
+    if (_lcd_ID == 0x1526 && (rotation & 1)) {
+		int16_t dx = x1 - x, dy = y1 - y;
+		if (dy == 0) { y1++; }
+		else if (dx == 0) { x1 += dy; y1 -= dy; }
+    }
+#endif
+    if (_lcd_capable & MIPI_DCS_REV1) {
+        WriteCmdParam4(_SC, x >> 8, x, x1 >> 8, x1);   //Start column instead of _MC
+        WriteCmdParam4(_SP, y >> 8, y, y1 >> 8, y1);   //
+        if (is8347 && _lcd_ID == 0x0065) {             //HX8352-B has separate _MC, _SC
+            uint8_t d[2];
+            d[0] = x >> 8; d[1] = x;
+            WriteCmdParamN(_MC, 2, d);                 //allows !MV_AXIS to work
+            d[0] = y >> 8; d[1] = y;
+            WriteCmdParamN(_MP, 2, d);
+        }
+    } else {
+        WriteCmdData(_MC, x);
+        WriteCmdData(_MP, y);
+        if (!(x == x1 && y == y1)) {  //only need MC,MP for drawPixel
+            if (_lcd_capable & XSA_XEA_16BIT) {
+                if (rotation & 1)
+                    y1 = y = (y1 << 8) | y;
+                else
+                    x1 = x = (x1 << 8) | x;
+            }
+            WriteCmdData(_SC, x);
+            WriteCmdData(_SP, y);
+            WriteCmdData(_EC, x1);
+            WriteCmdData(_EP, y1);
+        }
+    }
+}
+
+void fillScreen(uint16_t color)
+{
+    fillRect(0, 0, _width, _height, color);
+}
+
+void invertDisplay(uint8_t i)
+{
+    uint8_t val;
+    _lcd_rev = ((_lcd_capable & REV_SCREEN) != 0) ^ i;
+    if (_lcd_capable & MIPI_DCS_REV1) {
+        if (is8347) {
+            // HX8347D: 0x36 Panel Characteristic. REV_Panel
+            // HX8347A: 0x36 is Display Control 10
+            if (_lcd_ID == 0x8347 || _lcd_ID == 0x5252) // HX8347-A, HX5352-A
+			    val = _lcd_rev ? 6 : 2;       //INVON id bit#2,  NORON=bit#1
+            else val = _lcd_rev ? 8 : 10;     //HX8347-D, G, I: SCROLLON=bit3, INVON=bit1
+            // HX8347: 0x01 Display Mode has diff bit mapping for A, D
+            WriteCmdParamN(0x01, 1, &val);
+        } else
+            WriteCmdParamN(_lcd_rev ? 0x21 : 0x20, 0, NULL);
+        return;
+    }
+    // cope with 9320 style variants:
+    switch (_lcd_ID) {
+#ifdef SUPPORT_0139
+    case 0x0139:
+#endif
+    case 0x9225:                                        //REV is in reg(0x07) like Samsung
+    case 0x0154:
+        WriteCmdData(0x07, 0x13 | (_lcd_rev << 2));     //.kbv kludge
+        break;
+#ifdef SUPPORT_1289
+    case 0x1289:
+        _lcd_drivOut &= ~(1 << 13);
+        if (_lcd_rev)
+            _lcd_drivOut |= (1 << 13);
+        WriteCmdData(0x01, _lcd_drivOut);
+        break;
+#endif
+	case 0x5420:
+    case 0x7793:
+    case 0x9326:
+	case 0xB509:
+        WriteCmdData(0x401, (1 << 1) | _lcd_rev);       //.kbv kludge VLE
+        break;
+    default:
+        WriteCmdData(0x61, _lcd_rev);
+        break;
+    }
+}
+
+
+static void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color)
+{
+    int16_t end;
+#if defined(SUPPORT_9488_555)
+    if (is555) color = color565_to_555(color);
+#endif
+    if (w < 0) {
+        w = -w;
+        x -= w;
+    }                           //+ve w
+    end = x + w;
+    if (x < 0)
+        x = 0;
+    if (end > width())
+        end = width();
+    w = end - x;
+    if (h < 0) {
+        h = -h;
+        y -= h;
+    }                           //+ve h
+    end = y + h;
+    if (y < 0)
+        y = 0;
+    if (end > height())
+        end = height();
+    h = end - y;
+    setAddrWindow(x, y, x + w - 1, y + h - 1);
+    CS_ACTIVE;
+    WriteCmd(_MW);
+    if (h > w) {
+        end = h;
+        h = w;
+        w = end;
+    }
+    uint8_t hi = color >> 8, lo = color & 0xFF;
+    while (h-- > 0) {
+        end = w;
+#if USING_16BIT_BUS
+#if defined(__MK66FX1M0__)      //180MHz M4
+#define STROBE_16BIT {WR_ACTIVE4;WR_ACTIVE;WR_IDLE4;WR_IDLE;}   //56ns
+#elif defined(__SAM3X8E__)      //84MHz M3
+#define STROBE_16BIT {WR_ACTIVE4;WR_ACTIVE2;WR_IDLE4;WR_IDLE2;} //286ns ?ILI9486
+//#define STROBE_16BIT {WR_ACTIVE4;WR_ACTIVE;WR_IDLE4;WR_IDLE;} //238ns SSD1289
+//#define STROBE_16BIT {WR_ACTIVE2;WR_ACTIVE;WR_IDLE2;}      //119ns RM68140
+#else                           //16MHz AVR
+#define STROBE_16BIT {WR_ACTIVE;WR_ACTIVE;WR_IDLE; }            //375ns ?ILI9486
+#endif
+        write_16(color);        //we could just do the strobe
+        lo = end & 7;
+        hi = end >> 3;
+        if (hi)
+            do {
+                STROBE_16BIT;
+                STROBE_16BIT;
+                STROBE_16BIT;
+                STROBE_16BIT;
+                STROBE_16BIT;
+                STROBE_16BIT;
+                STROBE_16BIT;
+                STROBE_16BIT;
+            } while (--hi > 0);
+        while (lo-- > 0) {
+            STROBE_16BIT;
+        }
+#else
+#if defined(SUPPORT_1289)
+        if (is9797) {
+             uint8_t r = color565_to_r(color);
+             uint8_t g = color565_to_g(color);
+             uint8_t b = color565_to_b(color);
+             do {
+                 write8(r);
+                 write8(g);
+                 write8(b);
+             } while (--end != 0);
+        } else
+#endif
+        do {
+            write8(hi);
+            write8(lo);
+        } while (--end != 0);
+#endif
+    }
+    CS_IDLE;
+    if (!(_lcd_capable & MIPI_DCS_REV1) || ((_lcd_ID == 0x1526) && (rotation & 1)))
+        setAddrWindow(0, 0, width() - 1, height() - 1);
+}
+
+
+void fillFB(int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint16_t *color)
+{
+    int16_t end;
+    setAddrWindow(x1, y1, x2, y2);
+    CS_ACTIVE;
+    WriteCmd(_MW);
+
+    int w = x2-x1+1;
+    int h = y2-y1+1;
+
+    int indx = 0;
+
+    while (h-- > 0)
+    {
+        end = w;
+#if USING_16BIT_BUS
+#if defined(__MK66FX1M0__)      //180MHz M4
+#define STROBE_16BIT {WR_ACTIVE4;WR_ACTIVE;WR_IDLE4;WR_IDLE;}   //56ns
+#elif defined(__SAM3X8E__)      //84MHz M3
+#define STROBE_16BIT {WR_ACTIVE4;WR_ACTIVE2;WR_IDLE4;WR_IDLE2;} //286ns ?ILI9486
+//#define STROBE_16BIT {WR_ACTIVE4;WR_ACTIVE;WR_IDLE4;WR_IDLE;} //238ns SSD1289
+//#define STROBE_16BIT {WR_ACTIVE2;WR_ACTIVE;WR_IDLE2;}      //119ns RM68140
+#else                           //16MHz AVR
+#define STROBE_16BIT {WR_ACTIVE;WR_ACTIVE;WR_IDLE; }            //375ns ?ILI9486
+#endif
+        write_16(color[indx]);        //we could just do the strobe
+        lo = end & 7;
+        hi = end >> 3;
+        if (hi)
+            do {
+                STROBE_16BIT;
+                STROBE_16BIT;
+                STROBE_16BIT;
+                STROBE_16BIT;
+                STROBE_16BIT;
+                STROBE_16BIT;
+                STROBE_16BIT;
+                STROBE_16BIT;
+            } while (--hi > 0);
+        while (lo-- > 0) {
+            STROBE_16BIT;
+        }
+#else
+#if defined(SUPPORT_1289)
+        if (is9797) {
+             uint8_t r = color565_to_r(color[indx]);
+             uint8_t g = color565_to_g(color[indx]);
+             uint8_t b = color565_to_b(color[indx]);
+             do {
+                 write8(r);
+                 write8(g);
+                 write8(b);
+             } while (--end != 0);
+        } else
+#endif
+        do
+        {
+#if defined(SUPPORT_9488_555)
+    if (is555) color[indx] = color565_to_555(color[indx]);
+#endif
+        	write16(color[indx]);
+            indx++;
+        } while (--end != 0);
+    }
+#endif
+    CS_IDLE;
+    if (!(_lcd_capable & MIPI_DCS_REV1) || ((_lcd_ID == 0x1526) && (rotation & 1)))
+        setAddrWindow(0, 0, width() - 1, height() - 1);
+}
+
 
 void tft_init(uint16_t ID)
 {
-	int dummy=0;
     int16_t *p16;               //so we can "write" to a const protected variable.
     const uint8_t *table8_ads = NULL;
     int16_t table_size;
+    reset();
     _lcd_xor = 0;
     switch (_lcd_ID = ID) {
 /*
@@ -541,6 +1090,37 @@ void tft_init(uint16_t ID)
         break;
 #endif
 
+#ifdef SUPPORT_05A1
+    case 0x05A1:
+        _lcd_capable = AUTO_READINC | MIPI_DCS_REV1 | MV_AXIS;
+        static const uint8_t S6D05A1_regValues_max[]  = {
+            0xF0, 2, 0x5A, 0x5A,
+            0xF1, 2, 0x5A, 0x5A,
+            0xF2, 19, 0x3B, 0x33, 0x03, 0x0C, 0x08, 0x08, 0x08, 0x00, 0x08, 0x08, 0x00, 0x00, 0x00, 0x00, 0x33, 0x0C, 0x08, 0x0C, 0x08,
+            0xF4, 14, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x70, 0x03, 0x04, 0x70, 0x03,
+            0xF5, 12, 0x00, 0x46, 0x70, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x46, 0x70,
+            0xF6, 8, 0x03, 0x00, 0x08, 0x03, 0x03, 0x00, 0x03, 0x00,
+            0xF7, 5, 0x00, 0x80, 0x10, 0x02, 0x00,
+            0xF8, 2, 0x11, 0x00,
+            0xF9, 1, 0x14,
+            0xFA, 16, 0x33, 0x07, 0x04, 0x1A, 0x18, 0x1C, 0x24, 0x1D, 0x26, 0x28, 0x2F, 0x2E, 0x00, 0x00, 0x00, 0x00,
+            0xFB, 16, 0x33, 0x03, 0x00, 0x2E, 0x2F, 0x28, 0x26, 0x1D, 0x24, 0x1C, 0x18, 0x1A, 0x04, 0x00, 0x00, 0x00,
+            0xF9, 1, 0x12,
+            0xFA, 16, 0x36, 0x07, 0x04, 0x1C, 0x1C, 0x23, 0x28, 0x1C, 0x25, 0x26, 0x2E, 0x2B, 0x00, 0x00, 0x00, 0x00,
+            0xFB, 16, 0x33, 0x06, 0x00, 0x2B, 0x2E, 0x26, 0x25, 0x1C, 0x28, 0x23, 0x1C, 0x1C, 0x04, 0x00, 0x00, 0x00,
+            0xF9, 1, 0x11,
+            0xFA, 16, 0x33, 0x07, 0x04, 0x30, 0x32, 0x34, 0x35, 0x11, 0x1D, 0x20, 0x28, 0x20, 0x00, 0x00, 0x00, 0x00,
+            0xFB, 16, 0x33, 0x03, 0x00, 0x20, 0x28, 0x20, 0x1D, 0x11, 0x35, 0x34, 0x32, 0x30, 0x04, 0x00, 0x00, 0x00,
+            0x44, 2, 0x00, 0x01,
+        };
+        table8_ads = S6D05A1_regValues_max, table_size = sizeof(S6D05A1_regValues_max);
+        p16 = (int16_t *) & _height;
+        *p16 = 480;
+        p16 = (int16_t *) & _width;
+        *p16 = 320;
+        break;
+#endif
+
 #ifdef SUPPORT_1289
     case 0x9797:
         is9797 = 1;
@@ -552,7 +1132,7 @@ void tft_init(uint16_t ID)
     case 0x1289:
         _lcd_capable = 0 | XSA_XEA_16BIT | REV_SCREEN | AUTO_READINC;
       common_1289:
-	    dummy=1;
+	    __asm("nop");
         // came from MikroElektronika library http://www.hmsprojects.com/tft_lcd.html
         static const uint16_t SSD1289_regValues[]  = {
             0x0000, 0x0001,
@@ -596,9 +1176,9 @@ void tft_init(uint16_t ID)
 			0xB0, 1, 0x00,       //Command Access Protect
         };
         table8_ads = R61511_regValues, table_size = sizeof(R61511_regValues);
-        p16 = (int16_t *) & height;
+        p16 = (int16_t *) & _height;
         *p16 = 480;
-        p16 = (int16_t *) & width;
+        p16 = (int16_t *) & _width;
         *p16 = 320;
         break;
 
@@ -884,12 +1464,55 @@ void tft_init(uint16_t ID)
 //        table8_ads = SSD1963_NHD_70_regValues, table_size = sizeof(SSD1963_NHD_70_regValues);
 //        table8_ads = SSD1963_800NEW_regValues, table_size = sizeof(SSD1963_800NEW_regValues);
 //        table8_ads = SSD1963_800ALT_regValues, table_size = sizeof(SSD1963_800ALT_regValues);
-        p16 = (int16_t *) & height;
+        p16 = (int16_t *) & _height;
         *p16 = 480;
-        p16 = (int16_t *) & width;
+        p16 = (int16_t *) & _width;
         *p16 = 800;
         break;
 #endif
+
+    case 0x3229:
+        _lcd_capable = 0 | AUTO_READINC | MIPI_DCS_REV1 | MV_AXIS | INVERT_SS; // | READ_24BITS;
+        static const uint8_t UNK3229_regValues[]  = {
+            //----------------Star Initial Sequence-------//
+            //            0x11, 0, // exit sleep
+            0x06, 0, //enter extern command [cmd=0x0607]
+            0x07, 0,
+            0xb1, 2, 0x00, 0x12,      //RTN [00 12]
+            0xb4, 1, 0x02,            //line inversion [02]
+            0xb6, 4, 0x00, 0x20, 0x27, 0x00, //[0A 82 27 00]
+            0xca, 1, 0x01,            // [23]
+            0xcb, 1, 0x03,            // [20]
+            0xc0, 1, 0x13,            //vrh [21]
+            TFTLCD_DELAY8, 20,
+            0xc5, 1, 0xcc,            // [00]
+            0xc6, 1, 0x00,            // [00]
+            0xc7, 1, 0x04,            //osc [83]
+            0xc8, 1, 0x03,            // [20]
+            0xcc, 1, 0x06,            //vcm [31]
+            0xcd, 1, 0x1c,            //vdv [18]
+            0xf9, 2, 0x15, 0x15,      // ?? 13bit 454 [37]
+            0xf3, 3, 0x0a, 0x02, 0x0a, // [06 03 06]
+            0xf6, 3, 0x01, 0x10, 0x00, // [01 10 00]
+            /*
+                        0xe0, 1, 0x05,            //I don't believe these registers
+                        0xe1, 1, 0x32,            //safer to use power-on defaults
+                        0xe2, 1, 0x77,
+                        0xe3, 1, 0x77,
+                        0xe4, 1, 0x7f,
+                        0xe5, 1, 0xfa,
+                        0xe6, 1, 0x00,
+                        0xe7, 1, 0x74,
+                        0xe8, 1, 0x27,
+                        0xe9, 1, 0x10,
+                        0xea, 1, 0xc0,
+                        0xeb, 1, 0x25,
+            */
+            0xfa, 0, //exit extern command [cmd=0xFAFB]
+            0xfb, 0,
+        };
+        table8_ads = UNK3229_regValues, table_size = sizeof(UNK3229_regValues); //
+        break;
 
 #ifdef SUPPORT_4532
 //Support for LG Electronics LGDP4532 (also 4531 i guess) by Leodino v1.0 2-Nov-2016
@@ -1002,9 +1625,9 @@ case 0x4532:    // thanks Leodino
             TFTLCD_DELAY8, 10,    //just some dummy
         };
         table8_ads = NT35310_regValues, table_size = sizeof(NT35310_regValues);
-        p16 = (int16_t *) & height;
+        p16 = (int16_t *) & _height;
         *p16 = 480;
-        p16 = (int16_t *) & width;
+        p16 = (int16_t *) & _width;
         *p16 = 320;
         break;
 
@@ -1015,9 +1638,9 @@ case 0x4532:    // thanks Leodino
             0x3A, 1, 0x55,      //Pixel format .kbv my Mega Shield
         };
         table8_ads = RM68140_regValues_max, table_size = sizeof(RM68140_regValues_max);
-        p16 = (int16_t *) & height;
+        p16 = (int16_t *) & _height;
         *p16 = 480;
-        p16 = (int16_t *) & width;
+        p16 = (int16_t *) & _width;
         *p16 = 320;
         break;
 #endif
@@ -1040,9 +1663,9 @@ case 0x4532:    // thanks Leodino
             0xC5, 1, 0x0E,              // [05] VMCTR1 VCOM
         };
         table8_ads = table7735S, table_size = sizeof(table7735S);   //
-        p16 = (int16_t *) & height;
+        p16 = (int16_t *) & _height;
         *p16 = 160;
-        p16 = (int16_t *) & width;
+        p16 = (int16_t *) & _width;
         *p16 = 128;
         break;
 #endif
@@ -1092,7 +1715,46 @@ case 0x4532:    // thanks Leodino
             0x0007, 0x0133,     // Display Control (R07h)
             TFTLCD_DELAY, 50,
         };
-        init_table16(ST7781_regValues, sizeof(ST7781_regValues));
+        static const uint16_t ST7781_regValues_CPT24[]  = {
+            0x0001, 0x0100,     // Driver Output Control Register (R01h)
+            0x0002, 0x0700,     // LCD Driving Waveform Control (R02h)
+            0x0003, 0x1030,     // Entry Mode (R03h)
+            0x0008, 0x0302,     // Porch
+            0x0009, 0x0000,     // Scan
+            0x000A, 0x0008,     // Fmark Off
+            0x0010, 0x0000,     // Power Control 1 (R10h)
+            0x0011, 0x0005,     // Power Control 2 (R11h)
+            0x0012, 0x0000,     // Power Control 3 (R12h)
+            0x0013, 0x0000,     // Power Control 4 (R13h)
+            TFTLCD_DELAY, 100,
+            0x0010, 0x12B0,     // Power Control 1 SAP=1, BT=2, APE=1, AP=3
+            TFTLCD_DELAY, 50,
+            0x0011, 0x0007,     // Power Control 2 VC=7
+            TFTLCD_DELAY, 50,
+            0x0012, 0x008C,     // Power Control 3 VCIRE=1, VRH=12
+            0x0013, 0x1700,     // Power Control 4 VDV=23
+            0x0029, 0x0020,     // NVM read data 2 VCM=32
+            TFTLCD_DELAY, 50,
+            0x0030, 0x0000,     // Gamma Control 1 App Note CPT 2.4
+            0x0031, 0x0106,     // Gamma Control 2
+            0x0032, 0x0101,     // Gamma Control 3
+            0x0035, 0x0106,     // Gamma Control 4
+            0x0036, 0x0203,     // Gamma Control 5
+            0x0037, 0x0000,     // Gamma Control 6
+            0x0038, 0x0707,     // Gamma Control 7
+            0x0039, 0x0204,     // Gamma Control 8
+            0x003C, 0x0106,     // Gamma Control 9
+            0x003D, 0x0103,     // Gamma Control 10
+            0x0060, 0xA700,     // Driver Output Control (R60h) .kbv was 0xa700
+            0x0061, 0x0001,     // Driver Output Control (R61h)
+            0x0090, 0X0030,     // Panel Interface Control 1 (R90h)
+
+            // Display On
+            0x0007, 0x0133,     // Display Control (R07h)
+            TFTLCD_DELAY, 50,
+        };
+        init_table16(ST7781_regValues_CPT24, sizeof(ST7781_regValues_CPT24));
+        //init_table16(ST7781_regValues, sizeof(ST7781_regValues));
         break;
 #endif
 
@@ -1236,7 +1898,7 @@ case 0x4532:    // thanks Leodino
             0x55, 1, 0x06,      //SM_PANEL=0, SS_PANEL=0, GS_PANEL=1, REV_PANEL=1, BGR_PANEL=0
         };
         init_table(HX8352A_regValues, sizeof(HX8352A_regValues));
-        p16 = (int16_t *) & height;
+        p16 = (int16_t *) & _height;
         *p16 = 400;
         break;
 #endif
@@ -1293,7 +1955,7 @@ case 0x4532:    // thanks Leodino
 
         };
         init_table(HX8352B_regValues, sizeof(HX8352B_regValues));
-        p16 = (int16_t *) & height;
+        p16 = (int16_t *) & _height;
         *p16 = 400;
         break;
 #endif
@@ -1500,14 +2162,14 @@ case 0x4532:    // thanks Leodino
     case 0x9090:                //BIG CHANGE: HX8357-D was 0x8357
         _lcd_capable = AUTO_READINC | MIPI_DCS_REV1 | MV_AXIS | REV_SCREEN | READ_24BITS;
       common_8357:
-	  	dummy=1;
+	  __asm("nop");
         static const uint8_t HX8357C_regValues[]  = {
             TFTLCD_DELAY8, 1,  //dummy table
         };
         table8_ads = HX8357C_regValues, table_size = sizeof(HX8357C_regValues);
-        p16 = (int16_t *) & height;
+        p16 = (int16_t *) & _height;
         *p16 = 480;
-        p16 = (int16_t *) & width;
+        p16 = (int16_t *) & _width;
         *p16 = 320;
         break;
 
@@ -1526,9 +2188,9 @@ case 0x4532:    // thanks Leodino
 #endif
         };
         table8_ads = HX8357_99_regValues, table_size = sizeof(HX8357_99_regValues);
-        p16 = (int16_t *) & height;
+        p16 = (int16_t *) & _height;
         *p16 = 480;
-        p16 = (int16_t *) & width;
+        p16 = (int16_t *) & _width;
         *p16 = 320;
         break;
 
@@ -1600,9 +2262,9 @@ case 0x4532:    // thanks Leodino
             0xC7, 1, 0,          // [40] VCOMOFFS
         };
         table8_ads = table9163C, table_size = sizeof(table9163C);   //
-        p16 = (int16_t *) & height;
+        p16 = (int16_t *) & _height;
         *p16 = 160;
-        p16 = (int16_t *) & width;
+        p16 = (int16_t *) & _width;
         *p16 = 128;
         break;
 #endif
@@ -1715,13 +2377,14 @@ case 0x4532:    // thanks Leodino
             ILI9225_DISP_CTRL1, 0x1017,
         };
         init_table16(ILI9225_regValues, sizeof(ILI9225_regValues));
-        p16 = (int16_t *) & height;
+        p16 = (int16_t *) & _height;
         *p16 = 220;
-        p16 = (int16_t *) & width;
+        p16 = (int16_t *) & _width;
         *p16 = 176;
         break;
 #endif
 
+#ifdef SUPPORT_9320
     case 0x0001:
         _lcd_capable = 0 | REV_SCREEN | INVERT_GS; //no RGB bug. thanks Ivo_Deshev
         goto common_9320;
@@ -1733,7 +2396,7 @@ case 0x4532:    // thanks Leodino
     case 0x9320:
         _lcd_capable = 0 | REV_SCREEN | READ_BGR;
       common_9320:
-	    dummy=1;
+	  __asm("nop");
         static const uint16_t ILI9320_regValues[]  = {
             0x00e5, 0x8000,
             0x0000, 0x0001,
@@ -1798,6 +2461,9 @@ case 0x4532:    // thanks Leodino
         };
         init_table16(ILI9320_regValues, sizeof(ILI9320_regValues));
         break;
+#endif
+
+#ifdef SUPPORT_9325
     case 0x6809:
         _lcd_capable = 0 | REV_SCREEN | INVERT_GS | AUTO_READINC;
         goto common_93x5;
@@ -1809,7 +2475,7 @@ case 0x4532:    // thanks Leodino
     case 0x9335:
         _lcd_capable = 0 | REV_SCREEN;
       common_93x5:
-	    dummy=1;
+	    __asm("nop");
         static const uint16_t ILI9325_regValues[]  = {
             0x00E5, 0x78F0,     // set SRAM internal timing
             0x0001, 0x0100,     // set Driver Output Control
@@ -1872,6 +2538,7 @@ case 0x4532:    // thanks Leodino
         };
         init_table16(ILI9325_regValues, sizeof(ILI9325_regValues));
         break;
+#endif
 
 #if defined(SUPPORT_9326_5420)
 	case 0x5420:
@@ -1933,9 +2600,9 @@ case 0x4532:    // thanks Leodino
          0x0007, 0x0173,     //  262K color and display ON
 		 };
         init_table16(ILI9326_CPT28_regValues, sizeof(ILI9326_CPT28_regValues));
-        p16 = (int16_t *) & height;
+        p16 = (int16_t *) & _height;
         *p16 = 400;
-        p16 = (int16_t *) & width;
+        p16 = (int16_t *) & _width;
         *p16 = 240;
         break;
 #endif
@@ -1958,9 +2625,9 @@ case 0x4532:    // thanks Leodino
             //                     0xB0, 1, 0x03,      //Enable Protect
         };
         table8_ads = ILI9327_regValues, table_size = sizeof(ILI9327_regValues);
-        p16 = (int16_t *) & height;
+        p16 = (int16_t *) & _height;
         *p16 = 400;
-        p16 = (int16_t *) & width;
+        p16 = (int16_t *) & _width;
         *p16 = 240;
         break;
     case 0x1602:
@@ -1972,6 +2639,9 @@ case 0x4532:    // thanks Leodino
         table8_ads = XX1602_regValues, table_size = sizeof(XX1602_regValues);
         break;
 
+    case 0xE300:    //weird from BangGood
+        _lcd_capable = AUTO_READINC | MIPI_DCS_REV1 | MV_AXIS | READ_24BITS | INVERT_SS | INVERT_RGB;
+        goto common_9329;
     case 0x2053:    //weird from BangGood
         _lcd_capable = AUTO_READINC | MIPI_DCS_REV1 | MV_AXIS | READ_24BITS | REV_SCREEN | READ_BGR;
 		goto common_9329;
@@ -1987,7 +2657,7 @@ case 0x4532:    // thanks Leodino
     case 0x9329:
         _lcd_capable = AUTO_READINC | MIPI_DCS_REV1 | MV_AXIS | INVERT_SS | REV_SCREEN;
 	  common_9329:
-	    dummy=1;
+	    __asm("nop");
         static const uint8_t ILI9329_regValues[]  = {
 //            0xF6, 3, 0x01, 0x01, 0x00,  //Interface Control needs EXTC=1 MX_EOR=1, TM=0, RIM=0
 //            0xB6, 3, 0x0A, 0x82, 0x27,  //Display Function [0A 82 27]
@@ -1997,12 +2667,14 @@ case 0x4532:    // thanks Leodino
         table8_ads = ILI9329_regValues, table_size = sizeof(ILI9329_regValues);
         break;
 
-    case 0x9340:                //ILI9340 thanks Ravi_kanchan2004.
-        _lcd_capable = AUTO_READINC | MIPI_DCS_REV1 | MV_AXIS | READ_24BITS | REV_SCREEN;
+    case 0x9340:                //ILI9340 thanks Ravi_kanchan2004 and valmor_jr
+        //_lcd_capable = AUTO_READINC | MIPI_DCS_REV1 | MV_AXIS | READ_24BITS | REV_SCREEN; //Ravi
+        _lcd_capable = AUTO_READINC | MIPI_DCS_REV1 | MV_AXIS | READ_24BITS; //my new shield
         goto common_9341;
     case 0x9341:
-      common_9341:
         _lcd_capable = AUTO_READINC | MIPI_DCS_REV1 | MV_AXIS | READ_24BITS;
+      common_9341:
+	    __asm("nop");
         static const uint8_t ILI9341_regValues_2_4[]  = {        // BOE 2.4"
             0xF6, 3, 0x01, 0x01, 0x00,  //Interface Control needs EXTC=1 MV_EOR=0, TM=0, RIM=0
             0xCF, 3, 0x00, 0x81, 0x30,  //Power Control B [00 81 30]
@@ -2077,9 +2749,9 @@ case 0x4532:    // thanks Leodino
         table8_ads = ILI9342_regValues_CPT24, table_size = sizeof(ILI9342_regValues_CPT24);   //
         //        table8_ads = ILI9342_regValues_Tianma23, table_size = sizeof(ILI9342_regValues_Tianma23);   //
         //        table8_ads = ILI9342_regValues_HSD23, table_size = sizeof(ILI9342_regValues_HSD23);   //
-        p16 = (int16_t *) & height;
+        p16 = (int16_t *) & _height;
         *p16 = 240;
-        p16 = (int16_t *) & width;
+        p16 = (int16_t *) & _width;
         *p16 = 320;
         break;
 #endif
@@ -2089,7 +2761,7 @@ case 0x4532:    // thanks Leodino
     case 0x9481:
         _lcd_capable = AUTO_READINC | MIPI_DCS_REV1 | MV_AXIS | READ_BGR;
 	  common_9481:
-	    dummy=1;
+	    __asm("nop");
         static const uint8_t ILI9481_regValues[]  = {    // Atmel MaxTouch
             0xB0, 1, 0x00,              // unlocks E0, F0
             0xB3, 4, 0x02, 0x00, 0x00, 0x00, //Frame Memory, interface [02 00 00 00]
@@ -2179,9 +2851,9 @@ case 0x4532:    // thanks Leodino
 //        table8_ads = ILI9481_AUO317_regValues, table_size = sizeof(ILI9481_AUO317_regValues);
 //        table8_ads = ILI9481_CMO35_regValues, table_size = sizeof(ILI9481_CMO35_regValues);
 //        table8_ads = ILI9481_RGB_regValues, table_size = sizeof(ILI9481_RGB_regValues);
-        p16 = (int16_t *) & height;
+        p16 = (int16_t *) & _height;
         *p16 = 480;
-        p16 = (int16_t *) & width;
+        p16 = (int16_t *) & _width;
         *p16 = 320;
         break;
     case 0x9486:
@@ -2226,19 +2898,29 @@ case 0x4532:    // thanks Leodino
 #endif
         };
         table8_ads = ILI9486_regValues, table_size = sizeof(ILI9486_regValues);
-        p16 = (int16_t *) & height;
+        p16 = (int16_t *) & _height;
         *p16 = 480;
-        p16 = (int16_t *) & width;
+        p16 = (int16_t *) & _width;
         *p16 = 320;
         break;
     case 0x7796:
         _lcd_capable = AUTO_READINC | MIPI_DCS_REV1 | MV_AXIS;   //thanks to safari1
-        goto common_9488;
+        static const uint8_t  ST7796_regValues[] = {
+            0xB7, 1, 0xC6,              //Entry Mode      [06]
+            0xE8, 8, 0x40, 0x8A, 0x00, 0x00, 0x29, 0x19, 0xA5, 0x33, //Adj3 [40 8A 00 00 25 0A 38 33]
+        };
+        table8_ads = ST7796_regValues, table_size = sizeof(ST7796_regValues);
+        p16 = (int16_t *) & _height;
+        *p16 = 480;
+        p16 = (int16_t *) & _width;
+        *p16 = 320;
+        break;
+        //goto common_9488;
     case 0x9487:                //with thanks to Charlyf
     case 0x9488:
         _lcd_capable = AUTO_READINC | MIPI_DCS_REV1 | MV_AXIS | READ_24BITS;
       common_9488:
-	    dummy=1;
+	  	__asm("nop");
         static const uint8_t ILI9488_regValues_max[]  = {        // Atmel MaxTouch
             0xC0, 2, 0x10, 0x10,        //Power Control 1 [0E 0E]
             0xC1, 1, 0x41,      //Power Control 2 [43]
@@ -2253,9 +2935,9 @@ case 0x4532:    // thanks Leodino
             0xF7, 4, 0xA9, 0x51, 0x2C, 0x82,    //Adjustment Control 3 [A9 51 2C 82]
         };
         table8_ads = ILI9488_regValues_max, table_size = sizeof(ILI9488_regValues_max);
-        p16 = (int16_t *) & height;
+        p16 = (int16_t *) & _height;
         *p16 = 480;
-        p16 = (int16_t *) & width;
+        p16 = (int16_t *) & _width;
         *p16 = 320;
         break;
     case 0xB505:                //R61505V
@@ -2376,7 +3058,7 @@ case 0x4532:    // thanks Leodino
             0x0201, 0x0000,
         };
         init_table16(R61509V_regValues, sizeof(R61509V_regValues));
-        p16 = (int16_t *) & height;
+        p16 = (int16_t *) & _height;
         *p16 = 400;
         break;
 #endif
@@ -2408,15 +3090,15 @@ case 0x4532:    // thanks Leodino
             (0x35), 1, /*Tearing Effect ON*/0x00,
         };
         table8_ads = ILI9806_regValues, table_size = sizeof(ILI9806_regValues);
-        p16 = (int16_t *) & height;
+        p16 = (int16_t *) & _height;
         *p16 = 480;
-        p16 = (int16_t *) & width;
+        p16 = (int16_t *) & _width;
         *p16 = 854;
         break;
 #endif
     default:
-        p16 = (int16_t *) & width;
-        *p16 = 0;       //error value for width
+        p16 = (int16_t *) & _width;
+        *p16 = 0;       //error value for WIDTH
         break;
     }
     _lcd_rev = ((_lcd_capable & REV_SCREEN) != 0);
@@ -2451,1384 +3133,3 @@ case 0x4532:    // thanks Leodino
 	}
 #endif
 }
-
-
-
-
-uint16_t readID(void)
-{
-    uint16_t ret, ret2;
-    uint8_t msb;
-    ret = readReg(0,0);           //forces a reset() if called before begin()
-    if (ret == 0x5408)          //the SPFD5408 fails the 0xD3D3 test.
-        return 0x5408;
-    if (ret == 0x5420)          //the SPFD5420 fails the 0xD3D3 test.
-        return 0x5420;
-    if (ret == 0x8989)          //SSD1289 is always 8989
-        return 0x1289;
-    ret = readReg(0x67,0);        //HX8347-A
-    if (ret == 0x4747)
-        return 0x8347;
-//#if defined(SUPPORT_1963) && USING_16BIT_BUS
-    ret = readReg32(0xA1);      //SSD1963: [01 57 61 01]
-    if (ret == 0x6101)
-        return 0x1963;
-    if (ret == 0xFFFF)          //R61526: [xx FF FF FF]
-        return 0x1526;          //subsequent begin() enables Command Access
-//    if (ret == 0xFF00)          //R61520: [xx FF FF 00]
-//        return 0x1520;          //subsequent begin() enables Command Access
-//#endif
-	ret = readReg40(0xBF);
-	if (ret == 0x8357)          //HX8357B: [xx 01 62 83 57 FF]
-        return 0x8357;
-	if (ret == 0x9481)          //ILI9481: [xx 02 04 94 81 FF]
-        return 0x9481;
-    if (ret == 0x1511)          //?R61511: [xx 02 04 15 11] not tested yet
-        return 0x1511;
-    if (ret == 0x1520)          //?R61520: [xx 01 22 15 20]
-        return 0x1520;
-    if (ret == 0x1526)          //?R61526: [xx 01 22 15 26]
-        return 0x1526;
-    if (ret == 0x1581)          //R61581:  [xx 01 22 15 81]
-        return 0x1581;
-    if (ret == 0x1400)          //?RM68140:[xx FF 68 14 00] not tested yet
-        return 0x6814;
-    ret = readReg32(0xD4);
-    if (ret == 0x5310)          //NT35310: [xx 01 53 10]
-        return 0x5310;
-    ret = readReg32(0xD7);
-    if (ret == 0x8031)          //weird unknown from BangGood [xx 20 80 31] PrinceCharles
-        return 0x8031;
-    ret = readReg40(0xEF);      //ILI9327: [xx 02 04 93 27 FF]
-    if (ret == 0x9327)
-        return 0x9327;
-    ret = readReg32(0xFE) >> 8; //weird unknown from BangGood [04 20 53]
-    if (ret == 0x2053)
-        return 0x2053;
-    uint32_t ret32 = readReg32(0x04);
-    msb = ret32 >> 16;
-    ret = ret32;
-//    if (msb = 0x38 && ret == 0x8000) //unknown [xx 38 80 00] with D3 = 0x1602
-    if (msb == 0x00 && ret == 0x8000) { //HX8357-D [xx 00 80 00]
-#if 1
-        uint8_t cmds[] = {0xFF, 0x83, 0x57};
-        pushCommand(0xB9, cmds, 3);
-        msb = readReg(0xD0,0);
-        if (msb == 0x99) return 0x0099; //HX8357-D from datasheet
-        if (msb == 0x90)        //HX8357-C undocumented
-#endif
-            return 0x9090;      //BIG CHANGE: HX8357-D was 0x8357
-    }
-//    if (msb == 0xFF && ret == 0xFFFF) //R61526 [xx FF FF FF]
-//        return 0x1526;          //subsequent begin() enables Command Access
-    if (ret == 0x1526)          //R61526 [xx 06 15 26] if I have written NVM
-        return 0x1526;          //subsequent begin() enables Command Access
-	if (ret == 0x89F0)          //ST7735S: [xx 7C 89 F0]
-        return 0x7735;
-	if (ret == 0x8552)          //ST7789V: [xx 85 85 52]
-        return 0x7789;
-    if (ret == 0xAC11)          //?unknown [xx 61 AC 11]
-        return 0xAC11;
-    ret32 = readReg32(0xD3);      //[xx 91 63 00]
-    ret = ret32 >> 8;
-    if (ret == 0x9163) return ret;
-    ret = readReg32(0xD3);      //for ILI9488, 9486, 9340, 9341
-    msb = ret >> 8;
-    if (msb == 0x93 || msb == 0x94 || msb == 0x98 || msb == 0x77 || msb == 0x16)
-        return ret;             //0x9488, 9486, 9340, 9341, 7796
-    if (ret == 0x00D3 || ret == 0xD3D3)
-        return ret;             //16-bit write-only bus
-/*
-	msb = 0x12;                 //read 3rd,4th byte.  does not work in parallel
-	pushCommand(0xD9, &msb, 1);
-	ret2 = readReg(0xD3);
-    msb = 0x13;
-	pushCommand(0xD9, &msb, 1);
-	ret = (ret2 << 8) | readReg(0xD3);
-//	if (ret2 == 0x93)
-    	return ret2;
-*/
-	return readReg(0,0);          //0154, 7783, 9320, 9325, 9335, B505, B509
-}
-
-// independent cursor and window registers.   S6D0154, ST7781 increments.  ILI92320/5 do not.
-int16_t readGRAM(int16_t x, int16_t y, uint16_t * block, int16_t w, int16_t h)
-{
-    uint16_t ret, dummy, _MR = _MW;
-    int16_t n = w * h, row = 0, col = 0;
-    uint8_t r, g, b, tmp;
-    if (!is8347 && (_lcd_capable & MIPI_DCS_REV1)) // HX8347 uses same register
-        _MR = 0x2E;
-    if (_lcd_ID == 0x1602) _MR = 0x2E;
-    setAddrWindow(x, y, x + w - 1, y + h - 1);
-    while (n > 0) {
-        if (!(_lcd_capable & MIPI_DCS_REV1)) {
-            WriteCmdData(_MC, x + col);
-            WriteCmdData(_MP, y + row);
-        }
-        CS_ACTIVE;
-        WriteCmd(_MR);
-        setReadDir();
-        if (_lcd_capable & READ_NODUMMY) {
-            ;
-        } else if ((_lcd_capable & MIPI_DCS_REV1) || _lcd_ID == 0x1289) {
-            READ_8(r);
-        } else {
-            READ_16(dummy);
-        }
-		if (_lcd_ID == 0x1511) READ_8(r);   //extra dummy for R61511
-        while (n)
-        {
-            if (_lcd_capable & READ_24BITS)
-            {
-                READ_8(r);
-                READ_8(g);
-                READ_8(b);
-                if (_lcd_capable & READ_BGR)
-                    ret = color565(b, g, r);
-                else
-                    ret = color565(r, g, b);
-            } else
-            {
-                READ_16(ret);
-                if (_lcd_capable & READ_LOWHIGH)
-                    ret = (ret >> 8) | (ret << 8);
-                if (_lcd_capable & READ_BGR)
-                    ret = (ret & 0x07E0) | (ret >> 11) | (ret << 11);
-            }
-#if defined(SUPPORT_9488_555)
-    if (is555) ret = color555_to_565(ret);
-#endif
-            *block++ = ret;
-            n--;
-            if (!(_lcd_capable & AUTO_READINC))
-                break;
-        }
-        if (++col >= w) {
-            col = 0;
-            if (++row >= h)
-                row = 0;
-        }
-        RD_IDLE;
-        CS_IDLE;
-        setWriteDir();
-    }
-    if (!(_lcd_capable & MIPI_DCS_REV1))
-        setAddrWindow(0, 0, width() - 1, height() - 1);
-    return 0;
-}
-
-void setRotation(uint8_t r)
-{
-   uint16_t GS, SS_v, ORG, REV = _lcd_rev;
-   uint8_t val, d[3];
-   rotation = r & 3;           // just perform the operation ourselves on the protected variables
-   _width = (rotation & 1) ? HEIGHT : WIDTH;
-   _height = (rotation & 1) ? WIDTH : HEIGHT;
-   switch (rotation) {
-   case 0:                    //PORTRAIT:
-       val = 0x48;             //MY=0, MX=1, MV=0, ML=0, BGR=1
-       break;
-   case 1:                    //LANDSCAPE: 90 degrees
-       val = 0x28;             //MY=0, MX=0, MV=1, ML=0, BGR=1
-       break;
-   case 2:                    //PORTRAIT_REV: 180 degrees
-       val = 0x98;             //MY=1, MX=0, MV=0, ML=1, BGR=1
-       break;
-   case 3:                    //LANDSCAPE_REV: 270 degrees
-       val = 0xF8;             //MY=1, MX=1, MV=1, ML=1, BGR=1
-       break;
-   }
-   if (_lcd_capable & INVERT_GS)
-       val ^= 0x80;
-   if (_lcd_capable & INVERT_SS)
-       val ^= 0x40;
-   if (_lcd_capable & INVERT_RGB)
-       val ^= 0x08;
-   if (_lcd_capable & MIPI_DCS_REV1) {
-       if (_lcd_ID == 0x6814) {  //.kbv my weird 0x9486 might be 68140
-           GS = (val & 0x80) ? (1 << 6) : 0;   //MY
-           SS_v = (val & 0x40) ? (1 << 5) : 0;   //MX
-           val &= 0x28;        //keep MV, BGR, MY=0, MX=0, ML=0
-           d[0] = 0;
-           d[1] = GS | SS_v | 0x02;      //MY, MX
-           d[2] = 0x3B;
-           WriteCmdParamN(0xB6, 3, d);
-           goto common_MC;
-       }
-       else if (_lcd_ID == 0x1963 || _lcd_ID == 0x9481 || _lcd_ID == 0x1511) {
-           if (val & 0x80)
-               val |= 0x01;    //GS
-           if ((val & 0x40))
-               val |= 0x02;    //SS
-           if (_lcd_ID == 0x1963) val &= ~0xC0;
-           if (_lcd_ID == 0x9481) val &= ~0xD0;
-           if (_lcd_ID == 0x1511) {
-               val &= ~0x10;   //remove ML
-               val |= 0xC0;    //force penguin 180 rotation
-           }
-//            val &= (_lcd_ID == 0x1963) ? ~0xC0 : ~0xD0; //MY=0, MX=0 with ML=0 for ILI9481
-           goto common_MC;
-      }
-       else if (is8347) {
-           _MC = 0x02, _MP = 0x06, _MW = 0x22, _SC = 0x02, _EC = 0x04, _SP = 0x06, _EP = 0x08;
-           if (_lcd_ID == 0x0065) {             //HX8352-B
-               val |= 0x01;    //GS=1
-               if ((val & 0x10)) val ^= 0xD3;  //(ML) flip MY, MX, ML, SS, GS
-               if (r & 1) _MC = 0x82, _MP = 0x80;
-               else _MC = 0x80, _MP = 0x82;
-           }
-           if (_lcd_ID == 0x5252) {             //HX8352-A
-               val |= 0x02;   //VERT_SCROLLON
-               if ((val & 0x10)) val ^= 0xD4;  //(ML) flip MY, MX, SS. GS=1
-           }
-			goto common_BGR;
-       }
-     common_MC:
-       _MC = 0x2A, _MP = 0x2B, _MW = 0x2C, _SC = 0x2A, _EC = 0x2A, _SP = 0x2B, _EP = 0x2B;
-     common_BGR:
-       WriteCmdParamN(is8347 ? 0x16 : 0x36, 1, &val);
-       _lcd_madctl = val;
-//	    if (_lcd_ID	== 0x1963) WriteCmdParamN(0x13, 0, NULL);   //NORMAL mode
-   }
-   // cope with 9320 variants
-   else {
-       switch (_lcd_ID) {
-#if defined(SUPPORT_9225)
-       case 0x9225:
-           _SC = 0x37, _EC = 0x36, _SP = 0x39, _EP = 0x38;
-           _MC = 0x20, _MP = 0x21, _MW = 0x22;
-           GS = (val & 0x80) ? (1 << 9) : 0;
-           SS_v = (val & 0x40) ? (1 << 8) : 0;
-           WriteCmdData(0x01, GS | SS_v | 0x001C);       // set Driver Output Control
-           goto common_ORG;
-#endif
-#if defined(SUPPORT_0139) || defined(SUPPORT_0154)
-#ifdef SUPPORT_0139
-       case 0x0139:
-           _SC = 0x46, _EC = 0x46, _SP = 0x48, _EP = 0x47;
-           goto common_S6D;
-#endif
-#ifdef SUPPORT_0154
-       case 0x0154:
-           _SC = 0x37, _EC = 0x36, _SP = 0x39, _EP = 0x38;
-           goto common_S6D;
-#endif
-         common_S6D:
-           _MC = 0x20, _MP = 0x21, _MW = 0x22;
-           GS = (val & 0x80) ? (1 << 9) : 0;
-           SS_v = (val & 0x40) ? (1 << 8) : 0;
-           // S6D0139 requires NL = 0x27,  S6D0154 NL = 0x28
-           WriteCmdData(0x01, GS | SS_v | ((_lcd_ID == 0x0139) ? 0x27 : 0x28));
-           goto common_ORG;
-#endif
-       case 0x5420:
-       case 0x7793:
-       case 0x9326:
-		case 0xB509:
-           _MC = 0x200, _MP = 0x201, _MW = 0x202, _SC = 0x210, _EC = 0x211, _SP = 0x212, _EP = 0x213;
-           GS = (val & 0x80) ? (1 << 15) : 0;
-			uint16_t NL;
-			NL = ((432 / 8) - 1) << 9;
-           if (_lcd_ID == 0x9326 || _lcd_ID == 0x5420) NL >>= 1;
-           WriteCmdData(0x400, GS | NL);
-           goto common_SS;
-       default:
-           _MC = 0x20, _MP = 0x21, _MW = 0x22, _SC = 0x50, _EC = 0x51, _SP = 0x52, _EP = 0x53;
-           GS = (val & 0x80) ? (1 << 15) : 0;
-           WriteCmdData(0x60, GS | 0x2700);    // Gate Scan Line (0xA700)
-         common_SS:
-           SS_v = (val & 0x40) ? (1 << 8) : 0;
-           WriteCmdData(0x01, SS_v);     // set Driver Output Control
-         common_ORG:
-           ORG = (val & 0x20) ? (1 << 3) : 0;
-#ifdef SUPPORT_8230
-           if (_lcd_ID == 0x8230) {    // UC8230 has strange BGR and READ_BGR behaviour
-               if (rotation == 1 || rotation == 2) {
-                   val ^= 0x08;        // change BGR bit for LANDSCAPE and PORTRAIT_REV
-               }
-           }
-#endif
-           if (val & 0x08)
-               ORG |= 0x1000;  //BGR
-           _lcd_madctl = ORG | 0x0030;
-           WriteCmdData(0x03, _lcd_madctl);    // set GRAM write direction and BGR=1.
-           break;
-#ifdef SUPPORT_1289
-       case 0x1289:
-           _MC = 0x4E, _MP = 0x4F, _MW = 0x22, _SC = 0x44, _EC = 0x44, _SP = 0x45, _EP = 0x46;
-           if (rotation & 1)
-               val ^= 0xD0;    // exchange Landscape modes
-           GS = (val & 0x80) ? (1 << 14) : 0;    //called TB (top-bottom), CAD=0
-           SS_v = (val & 0x40) ? (1 << 9) : 0;   //called RL (right-left)
-           ORG = (val & 0x20) ? (1 << 3) : 0;  //called AM
-           _lcd_drivOut = GS | SS_v | (REV << 13) | 0x013F;      //REV=0, BGR=0, MUX=319
-           if (val & 0x08)
-               _lcd_drivOut |= 0x0800; //BGR
-           WriteCmdData(0x01, _lcd_drivOut);   // set Driver Output Control
-           if (is9797) WriteCmdData(0x11, ORG | 0x4C30); else  // DFM=2, DEN=1, WM=1, TY=0
-           WriteCmdData(0x11, ORG | 0x6070);   // DFM=3, EN=0, TY=1
-           break;
-#endif
-		}
-   }
-   if ((rotation & 1) && ((_lcd_capable & MV_AXIS) == 0)) {
-       uint16_t x;
-       x = _MC, _MC = _MP, _MP = x;
-       x = _SC, _SC = _SP, _SP = x;    //.kbv check 0139
-       x = _EC, _EC = _EP, _EP = x;    //.kbv check 0139
-   }
-   setAddrWindow(0, 0, width() - 1, height() - 1);
-   vertScroll(0, HEIGHT, 0);   //reset scrolling after a rotation
-}
-
-void drawPixel(int16_t x, int16_t y, uint16_t color)
-{
-   // MCUFRIEND just plots at edge if you try to write outside of the box:
-   if (x < 0 || y < 0 || x >= width() || y >= height())
-       return;
-#if defined(SUPPORT_9488_555)
-   if (is555) color = color565_to_555(color);
-#endif
-   setAddrWindow(x, y, x, y);
-//    CS_ACTIVE; WriteCmd(_MW); write16(color); CS_IDLE; //-0.01s +98B
-   if (is9797) { CS_ACTIVE; WriteCmd(_MW); write24(color); CS_IDLE;} else
-   WriteCmdData(_MW, color);
-}
-
-void setAddrWindow(int16_t x, int16_t y, int16_t x1, int16_t y1)
-{
-#if defined(OFFSET_9327)
-	if (_lcd_ID == 0x9327) {
-	    if (rotation == 2) y += OFFSET_9327, y1 += OFFSET_9327;
-	    if (rotation == 3) x += OFFSET_9327, x1 += OFFSET_9327;
-   }
-#endif
-#if 1
-   if (_lcd_ID == 0x1526 && (rotation & 1)) {
-		int16_t dx = x1 - x, dy = y1 - y;
-		if (dy == 0) { y1++; }
-		else if (dx == 0) { x1 += dy; y1 -= dy; }
-   }
-#endif
-   if (_lcd_capable & MIPI_DCS_REV1) {
-       WriteCmdParam4(_SC, x >> 8, x, x1 >> 8, x1);   //Start column instead of _MC
-       WriteCmdParam4(_SP, y >> 8, y, y1 >> 8, y1);   //
-       if (is8347 && _lcd_ID == 0x0065) {             //HX8352-B has separate _MC, _SC
-           uint8_t d[2];
-           d[0] = x >> 8; d[1] = x;
-           WriteCmdParamN(_MC, 2, d);                 //allows !MV_AXIS to work
-           d[0] = y >> 8; d[1] = y;
-           WriteCmdParamN(_MP, 2, d);
-       }
-   } else {
-       WriteCmdData(_MC, x);
-       WriteCmdData(_MP, y);
-       if (!(x == x1 && y == y1)) {  //only need MC,MP for drawPixel
-           if (_lcd_capable & XSA_XEA_16BIT) {
-               if (rotation & 1)
-                   y1 = y = (y1 << 8) | y;
-               else
-                   x1 = x = (x1 << 8) | x;
-           }
-           WriteCmdData(_SC, x);
-           WriteCmdData(_SP, y);
-           WriteCmdData(_EC, x1);
-           WriteCmdData(_EP, y1);
-       }
-   }
-}
-
-void vertScroll(int16_t top, int16_t scrollines, int16_t offset)
-{
-#if defined(OFFSET_9327)
-	if (_lcd_ID == 0x9327) {
-	    if (rotation == 2 || rotation == 3) top += OFFSET_9327;
-    }
-#endif
-    int16_t bfa = HEIGHT - top - scrollines;  // bottom fixed area
-    int16_t vsp;
-    int16_t sea = top;
-	if (_lcd_ID == 0x9327) bfa += 32;
-    if (offset <= -scrollines || offset >= scrollines) offset = 0; //valid scroll
-	vsp = top + offset; // vertical start position
-    if (offset < 0)
-        vsp += scrollines;          //keep in unsigned range
-    sea = top + scrollines - 1;
-    if (_lcd_capable & MIPI_DCS_REV1) {
-        uint8_t d[6];           // for multi-byte parameters
-        d[0] = top >> 8;        //TFA
-        d[1] = top;
-        d[2] = scrollines >> 8; //VSA
-        d[3] = scrollines;
-        d[4] = bfa >> 8;        //BFA
-        d[5] = bfa;
-        WriteCmdParamN(is8347 ? 0x0E : 0x33, 6, d);
-//        if (offset == 0 && rotation > 1) vsp = top + scrollines;   //make non-valid
-		d[0] = vsp >> 8;        //VSP
-        d[1] = vsp;
-        WriteCmdParamN(is8347 ? 0x14 : 0x37, 2, d);
-		if (is8347) {
-		    d[0] = (offset != 0) ? (_lcd_ID == 0x8347 ? 0x02 : 0x08) : 0;
-			WriteCmdParamN(_lcd_ID == 0x8347 ? 0x18 : 0x01, 1, d);  //HX8347-D
-		} else if (offset == 0 && (_lcd_capable & MIPI_DCS_REV1)) {
-			WriteCmdParamN(0x13, 0, NULL);    //NORMAL i.e. disable scroll
-		}
-		return;
-    }
-    // cope with 9320 style variants:
-    switch (_lcd_ID) {
-    case 0x7783:
-        WriteCmdData(0x61, _lcd_rev);   //!NDL, !VLE, REV
-        WriteCmdData(0x6A, vsp);        //VL#
-        break;
-#ifdef SUPPORT_0139
-    case 0x0139:
-        WriteCmdData(0x07, 0x0213 | (_lcd_rev << 2));  //VLE1=1, GON=1, REV=x, D=3
-        WriteCmdData(0x41, vsp);  //VL# check vsp
-        break;
-#endif
-#if defined(SUPPORT_0154) || defined(SUPPORT_9225)  //thanks tongbajiel
-    case 0x9225:
-	case 0x0154:
-        WriteCmdData(0x31, sea);        //SEA
-        WriteCmdData(0x32, top);        //SSA
-        WriteCmdData(0x33, vsp - top);  //SST
-        break;
-#endif
-#ifdef SUPPORT_1289
-    case 0x1289:
-        WriteCmdData(0x41, vsp);        //VL#
-        break;
-#endif
-	case 0x5420:
-    case 0x7793:
-	case 0x9326:
-	case 0xB509:
-        WriteCmdData(0x401, (1 << 1) | _lcd_rev);       //VLE, REV
-        WriteCmdData(0x404, vsp);       //VL#
-        break;
-    default:
-        // 0x6809, 0x9320, 0x9325, 0x9335, 0xB505 can only scroll whole screen
-        WriteCmdData(0x61, (1 << 1) | _lcd_rev);        //!NDL, VLE, REV
-        WriteCmdData(0x6A, vsp);        //VL#
-        break;
-    }
-}
-
-
-
-
-void pushColors16b(uint16_t * block, int16_t n, uint8_t first)
-{
-    pushColors_any(_MW, (uint8_t *)block, n, first, 0);
-}
-void pushColors8b(uint8_t * block, int16_t n, uint8_t first)
-{
-    pushColors_any(_MW, (uint8_t *)block, n, first, 2);   //regular bigend
-}
-void pushColors4n(const uint8_t * block, int16_t n, uint8_t first, uint8_t bigend)
-{
-    pushColors_any(_MW, (uint8_t *)block, n, first, bigend ? 3 : 1);
-}
-
-
-void fillScreen(uint16_t color)
-{
-    fillRect(0, 0, _width, _height, color);
-}
-
-void invertDisplay(uint8_t i)
-{
-    uint8_t val;
-    _lcd_rev = ((_lcd_capable & REV_SCREEN) != 0) ^ i;
-    if (_lcd_capable & MIPI_DCS_REV1) {
-        if (is8347) {
-            // HX8347D: 0x36 Panel Characteristic. REV_Panel
-            // HX8347A: 0x36 is Display Control 10
-            if (_lcd_ID == 0x8347 || _lcd_ID == 0x5252) // HX8347-A, HX5352-A
-			    val = _lcd_rev ? 6 : 2;       //INVON id bit#2,  NORON=bit#1
-            else val = _lcd_rev ? 8 : 10;     //HX8347-D, G, I: SCROLLON=bit3, INVON=bit1
-            // HX8347: 0x01 Display Mode has diff bit mapping for A, D
-            WriteCmdParamN(0x01, 1, &val);
-        } else
-            WriteCmdParamN(_lcd_rev ? 0x21 : 0x20, 0, NULL);
-        return;
-    }
-    // cope with 9320 style variants:
-    switch (_lcd_ID) {
-#ifdef SUPPORT_0139
-    case 0x0139:
-#endif
-    case 0x9225:                                        //REV is in reg(0x07) like Samsung
-    case 0x0154:
-        WriteCmdData(0x07, 0x13 | (_lcd_rev << 2));     //.kbv kludge
-        break;
-#ifdef SUPPORT_1289
-    case 0x1289:
-        _lcd_drivOut &= ~(1 << 13);
-        if (_lcd_rev)
-            _lcd_drivOut |= (1 << 13);
-        WriteCmdData(0x01, _lcd_drivOut);
-        break;
-#endif
-	case 0x5420:
-    case 0x7793:
-    case 0x9326:
-	case 0xB509:
-        WriteCmdData(0x401, (1 << 1) | _lcd_rev);       //.kbv kludge VLE
-        break;
-    default:
-        WriteCmdData(0x61, _lcd_rev);
-        break;
-    }
-}
-
-void  drawFastVLine(int16_t x, int16_t y, int16_t h, uint16_t color)
-{
-	fillRect(x, y, 1, h, color);
-}
-void  drawFastHLine(int16_t x, int16_t y, int16_t w, uint16_t color)
-{
-	fillRect(x, y, w, 1, color);
-}
-
-void writePixel(int16_t x, int16_t y, uint16_t color)
-{
-    drawPixel(x, y, color);
-}
-
-void writeLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1,
-        uint16_t color) {
-    int16_t steep = abs(y1 - y0) > abs(x1 - x0);
-    if (steep) {
-        _swap_int16_t(x0, y0);
-        _swap_int16_t(x1, y1);
-    }
-
-    if (x0 > x1) {
-        _swap_int16_t(x0, x1);
-        _swap_int16_t(y0, y1);
-    }
-
-    int16_t dx, dy;
-    dx = x1 - x0;
-    dy = abs(y1 - y0);
-
-    int16_t err = dx / 2;
-    int16_t ystep;
-
-    if (y0 < y1) {
-        ystep = 1;
-    } else {
-        ystep = -1;
-    }
-
-    for (; x0<=x1; x0++) {
-        if (steep) {
-            writePixel(y0, x0, color);
-        } else {
-            writePixel(x0, y0, color);
-        }
-        err -= dy;
-        if (err < 0) {
-            y0 += ystep;
-            err += dx;
-        }
-    }
-}
-
-
-void drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t color)
-{
-    if(x0 == x1){
-        if(y0 > y1) _swap_int16_t(y0, y1);
-        drawFastVLine(x0, y0, y1 - y0 + 1, color);
-    } else if(y0 == y1){
-        if(x0 > x1) _swap_int16_t(x0, x1);
-        drawFastHLine(x0, y0, x1 - x0 + 1, color);
-    } else {
-        writeLine(x0, y0, x1, y1, color);
-    }
-}
-
-void drawCircle(int16_t x0, int16_t y0, int16_t r, uint16_t color)
-{
-    int16_t f = 1 - r;
-    int16_t ddF_x = 1;
-    int16_t ddF_y = -2 * r;
-    int16_t x = 0;
-    int16_t y = r;
-
-    writePixel(x0  , y0+r, color);
-    writePixel(x0  , y0-r, color);
-    writePixel(x0+r, y0  , color);
-    writePixel(x0-r, y0  , color);
-
-    while (x<y) {
-        if (f >= 0) {
-            y--;
-            ddF_y += 2;
-            f += ddF_y;
-        }
-        x++;
-        ddF_x += 2;
-        f += ddF_x;
-
-        writePixel(x0 + x, y0 + y, color);
-        writePixel(x0 - x, y0 + y, color);
-        writePixel(x0 + x, y0 - y, color);
-        writePixel(x0 - x, y0 - y, color);
-        writePixel(x0 + y, y0 + x, color);
-        writePixel(x0 - y, y0 + x, color);
-        writePixel(x0 + y, y0 - x, color);
-        writePixel(x0 - y, y0 - x, color);
-    }
-}
-
-void drawCircleHelper( int16_t x0, int16_t y0, int16_t r, uint8_t cornername, uint16_t color)
-{
-    int16_t f     = 1 - r;
-    int16_t ddF_x = 1;
-    int16_t ddF_y = -2 * r;
-    int16_t x     = 0;
-    int16_t y     = r;
-
-    while (x<y) {
-        if (f >= 0) {
-            y--;
-            ddF_y += 2;
-            f     += ddF_y;
-        }
-        x++;
-        ddF_x += 2;
-        f     += ddF_x;
-        if (cornername & 0x4) {
-            writePixel(x0 + x, y0 + y, color);
-            writePixel(x0 + y, y0 + x, color);
-        }
-        if (cornername & 0x2) {
-            writePixel(x0 + x, y0 - y, color);
-            writePixel(x0 + y, y0 - x, color);
-        }
-        if (cornername & 0x8) {
-            writePixel(x0 - y, y0 + x, color);
-            writePixel(x0 - x, y0 + y, color);
-        }
-        if (cornername & 0x1) {
-            writePixel(x0 - y, y0 - x, color);
-            writePixel(x0 - x, y0 - y, color);
-        }
-    }
-}
-
-void fillCircle(int16_t x0, int16_t y0, int16_t r, uint16_t color)
-{
-    drawFastVLine(x0, y0-r, 2*r+1, color);
-    fillCircleHelper(x0, y0, r, 3, 0, color);
-}
-
-void fillCircleHelper(int16_t x0, int16_t y0, int16_t r, uint8_t corners, int16_t delta, uint16_t color)
-{
-
-    int16_t f     = 1 - r;
-    int16_t ddF_x = 1;
-    int16_t ddF_y = -2 * r;
-    int16_t x     = 0;
-    int16_t y     = r;
-    int16_t px    = x;
-    int16_t py    = y;
-
-    delta++; // Avoid some +1's in the loop
-
-    while(x < y) {
-        if (f >= 0) {
-            y--;
-            ddF_y += 2;
-            f     += ddF_y;
-        }
-        x++;
-        ddF_x += 2;
-        f     += ddF_x;
-        // These checks avoid double-drawing certain lines, important
-        // for the SSD1306 library which has an INVERT drawing mode.
-        if(x < (y + 1)) {
-            if(corners & 1) drawFastVLine(x0+x, y0-y, 2*y+delta, color);
-            if(corners & 2) drawFastVLine(x0-x, y0-y, 2*y+delta, color);
-        }
-        if(y != py) {
-            if(corners & 1) drawFastVLine(x0+py, y0-px, 2*px+delta, color);
-            if(corners & 2) drawFastVLine(x0-py, y0-px, 2*px+delta, color);
-            py = y;
-        }
-        px = x;
-    }
-}
-
-void drawRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color)
-{
-    drawFastHLine(x, y, w, color);
-    drawFastHLine(x, y+h-1, w, color);
-    drawFastVLine(x, y, h, color);
-    drawFastVLine(x+w-1, y, h, color);
-}
-
-void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color)
-{
-    int16_t end;
-    if (w < 0) {
-        w = -w;
-        x -= w;
-    }                           //+ve w
-    end = x + w;
-    if (x < 0)
-        x = 0;
-    if (end > width())
-        end = width();
-    w = end - x;
-    if (h < 0) {
-        h = -h;
-        y -= h;
-    }                           //+ve h
-    end = y + h;
-    if (y < 0)
-        y = 0;
-    if (end > height())
-        end = height();
-    h = end - y;
-    setAddrWindow(x, y, x + w - 1, y + h - 1);
-    CS_ACTIVE;
-    WriteCmd(_MW);
-    if (h > w) {
-        end = h;
-        h = w;
-        w = end;
-    }
-    uint8_t hi = color >> 8, lo = color & 0xFF;
-    while (h-- > 0) {
-        end = w;
-#if USING_16BIT_BUS
-#if defined(__MK66FX1M0__)      //180MHz M4
-#define STROBE_16BIT {WR_ACTIVE4;WR_ACTIVE;WR_IDLE4;WR_IDLE;}   //56ns
-#elif defined(__SAM3X8E__)      //84MHz M3
-#define STROBE_16BIT {WR_ACTIVE4;WR_ACTIVE2;WR_IDLE4;WR_IDLE2;} //286ns ?ILI9486
-//#define STROBE_16BIT {WR_ACTIVE4;WR_ACTIVE;WR_IDLE4;WR_IDLE;} //238ns SSD1289
-//#define STROBE_16BIT {WR_ACTIVE2;WR_ACTIVE;WR_IDLE2;}      //119ns RM68140
-#else                           //16MHz AVR
-#define STROBE_16BIT {WR_ACTIVE;WR_ACTIVE;WR_IDLE; }            //375ns ?ILI9486
-#endif
-        write_16(color);        //we could just do the strobe
-        lo = end & 7;
-        hi = end >> 3;
-        if (hi)
-            do {
-                STROBE_16BIT;
-                STROBE_16BIT;
-                STROBE_16BIT;
-                STROBE_16BIT;
-                STROBE_16BIT;
-                STROBE_16BIT;
-                STROBE_16BIT;
-                STROBE_16BIT;
-            } while (--hi > 0);
-        while (lo-- > 0) {
-            STROBE_16BIT;
-        }
-#else
-//#if defined(SUPPORT_1289)
-//        if (is9797) {
-//             uint8_t r = color565_to_r(color);
-//             uint8_t g = color565_to_g(color);
-//             uint8_t b = color565_to_b(color);
-//             do {
-//                 write8(r);
-//                 write8(g);
-//                 write8(b);
-//             } while (--end != 0);
-//        } else
-//#endif
-        do {
-            write8(hi);
-            write8(lo);
-        } while (--end != 0);
-#endif
-    }
-    CS_IDLE;
-    if (!(_lcd_capable & MIPI_DCS_REV1) || ((_lcd_ID == 0x1526) && (rotation & 1)))
-        setAddrWindow(0, 0, width() - 1, height() - 1);
-}
-
-
-void drawRoundRect(int16_t x, int16_t y, int16_t w, int16_t h, int16_t r, uint16_t color)
-{
-    int16_t max_radius = ((w < h) ? w : h) / 2; // 1/2 minor axis
-    if(r > max_radius) r = max_radius;
-    // smarter version
-    drawFastHLine(x+r  , y    , w-2*r, color); // Top
-    drawFastHLine(x+r  , y+h-1, w-2*r, color); // Bottom
-    drawFastVLine(x    , y+r  , h-2*r, color); // Left
-    drawFastVLine(x+w-1, y+r  , h-2*r, color); // Right
-    // draw four corners
-    drawCircleHelper(x+r    , y+r    , r, 1, color);
-    drawCircleHelper(x+w-r-1, y+r    , r, 2, color);
-    drawCircleHelper(x+w-r-1, y+h-r-1, r, 4, color);
-    drawCircleHelper(x+r    , y+h-r-1, r, 8, color);
-}
-
-
-void fillRoundRect(int16_t x, int16_t y, int16_t w, int16_t h, int16_t r, uint16_t color)
-{
-    int16_t max_radius = ((w < h) ? w : h) / 2; // 1/2 minor axis
-    if(r > max_radius) r = max_radius;
-    // smarter version
-    fillRect(x+r, y, w-2*r, h, color);
-    // draw four corners
-    fillCircleHelper(x+w-r-1, y+r, r, 1, h-2*r-1, color);
-    fillCircleHelper(x+r    , y+r, r, 2, h-2*r-1, color);
-}
-
-
-void drawTriangle(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint16_t color)
-{
-    drawLine(x0, y0, x1, y1, color);
-    drawLine(x1, y1, x2, y2, color);
-    drawLine(x2, y2, x0, y0, color);
-}
-
-
-void fillTriangle(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint16_t color)
-{
-
-    int16_t a, b, y, last;
-
-    // Sort coordinates by Y order (y2 >= y1 >= y0)
-    if (y0 > y1) {
-        _swap_int16_t(y0, y1); _swap_int16_t(x0, x1);
-    }
-    if (y1 > y2) {
-        _swap_int16_t(y2, y1); _swap_int16_t(x2, x1);
-    }
-    if (y0 > y1) {
-        _swap_int16_t(y0, y1); _swap_int16_t(x0, x1);
-    }
-
-    if(y0 == y2) { // Handle awkward all-on-same-line case as its own thing
-        a = b = x0;
-        if(x1 < a)      a = x1;
-        else if(x1 > b) b = x1;
-        if(x2 < a)      a = x2;
-        else if(x2 > b) b = x2;
-        drawFastHLine(a, y0, b-a+1, color);
-        return;
-    }
-
-    int16_t
-    dx01 = x1 - x0,
-    dy01 = y1 - y0,
-    dx02 = x2 - x0,
-    dy02 = y2 - y0,
-    dx12 = x2 - x1,
-    dy12 = y2 - y1;
-    int32_t
-    sa   = 0,
-    sb   = 0;
-
-    // For upper part of triangle, find scanline crossings for segments
-    // 0-1 and 0-2.  If y1=y2 (flat-bottomed triangle), the scanline y1
-    // is included here (and second loop will be skipped, avoiding a /0
-    // error there), otherwise scanline y1 is skipped here and handled
-    // in the second loop...which also avoids a /0 error here if y0=y1
-    // (flat-topped triangle).
-    if(y1 == y2) last = y1;   // Include y1 scanline
-    else         last = y1-1; // Skip it
-
-    for(y=y0; y<=last; y++) {
-        a   = x0 + sa / dy01;
-        b   = x0 + sb / dy02;
-        sa += dx01;
-        sb += dx02;
-        /* longhand:
-        a = x0 + (x1 - x0) * (y - y0) / (y1 - y0);
-        b = x0 + (x2 - x0) * (y - y0) / (y2 - y0);
-        */
-        if(a > b) _swap_int16_t(a,b);
-        drawFastHLine(a, y, b-a+1, color);
-    }
-
-    // For lower part of triangle, find scanline crossings for segments
-    // 0-2 and 1-2.  This loop is skipped if y1=y2.
-    sa = (int32_t)dx12 * (y - y1);
-    sb = (int32_t)dx02 * (y - y0);
-    for(; y<=y2; y++) {
-        a   = x1 + sa / dy12;
-        b   = x0 + sb / dy02;
-        sa += dx12;
-        sb += dx02;
-        /* longhand:
-        a = x1 + (x2 - x1) * (y - y1) / (y2 - y1);
-        b = x0 + (x2 - x0) * (y - y0) / (y2 - y0);
-        */
-        if(a > b) _swap_int16_t(a,b);
-        drawFastHLine(a, y, b-a+1, color);
-    }
-}
-
-
-/********************************* TESTS  *********************************************/
-
-void testFillScreen()
-{
-    fillScreen(BLACK);
-    fillScreen(RED);
-    fillScreen(GREEN);
-    fillScreen(BLUE);
-    fillScreen(BLACK);
-}
-
-void testLines(uint16_t color)
-{
-    int           x1, y1, x2, y2,
-                  w = width(),
-                  h = height();
-
-    //fillScreen(BLACK);
-
-    x1 = y1 = 0;
-    y2    = h - 1;
-    for (x2 = 0; x2 < w; x2 += 6) drawLine(x1, y1, x2, y2, color);
-    x2    = w - 1;
-    for (y2 = 0; y2 < h; y2 += 6) drawLine(x1, y1, x2, y2, color);
-
-    //fillScreen(BLACK);
-
-    x1    = w - 1;
-    y1    = 0;
-    y2    = h - 1;
-    for (x2 = 0; x2 < w; x2 += 6) drawLine(x1, y1, x2, y2, color);
-    x2    = 0;
-    for (y2 = 0; y2 < h; y2 += 6) drawLine(x1, y1, x2, y2, color);
-
-    //fillScreen(BLACK);
-
-    x1    = 0;
-    y1    = h - 1;
-    y2    = 0;
-    for (x2 = 0; x2 < w; x2 += 6) drawLine(x1, y1, x2, y2, color);
-    x2    = w - 1;
-    for (y2 = 0; y2 < h; y2 += 6) drawLine(x1, y1, x2, y2, color);
-
-    //fillScreen(BLACK);
-
-    x1    = w - 1;
-    y1    = h - 1;
-    y2    = 0;
-    for (x2 = 0; x2 < w; x2 += 6) drawLine(x1, y1, x2, y2, color);
-    x2    = 0;
-    for (y2 = 0; y2 < h; y2 += 6) drawLine(x1, y1, x2, y2, color);
-
-}
-
-void testFastLines(uint16_t color1, uint16_t color2)
-{
-    int           x, y, w = width(), h = height();
-
-    fillScreen(BLACK);
-    for (y = 0; y < h; y += 5) drawFastHLine(0, y, w, color1);
-    for (x = 0; x < w; x += 5) drawFastVLine(x, 0, h, color2);
-}
-
-void testRects(uint16_t color) {
-    int           n, i, i2,
-                  cx = width()  / 2,
-                  cy = height() / 2;
-
-    fillScreen(BLACK);
-    n     = min(width(), height());
-    for (i = 2; i < n; i += 6) {
-        i2 = i / 2;
-        drawRect(cx - i2, cy - i2, i, i, color);
-    }
-
-}
-
-void testFilledRects(uint16_t color1, uint16_t color2)
-{
-    int           n, i, i2,
-                  cx = width()  / 2 - 1,
-                  cy = height() / 2 - 1;
-
-    fillScreen(BLACK);
-    n = min(width(), height());
-    for (i = n; i > 0; i -= 6) {
-        i2    = i / 2;
-
-        fillRect(cx - i2, cy - i2, i, i, color1);
-
-        drawRect(cx - i2, cy - i2, i, i, color2);
-    }
-}
-
-void testFilledCircles(uint8_t radius, uint16_t color)
-{
-    int x, y, w = width(), h = height(), r2 = radius * 2;
-
-    fillScreen(BLACK);
-    for (x = radius; x < w; x += r2) {
-        for (y = radius; y < h; y += r2) {
-            fillCircle(x, y, radius, color);
-        }
-    }
-
-}
-
-void testCircles(uint8_t radius, uint16_t color)
-{
-    int           x, y, r2 = radius * 2,
-                        w = width()  + radius,
-                        h = height() + radius;
-
-    // Screen is not cleared for this one -- this is
-    // intentional and does not affect the reported time.
-    for (x = 0; x < w; x += r2) {
-        for (y = 0; y < h; y += r2) {
-            drawCircle(x, y, radius, color);
-        }
-    }
-
-}
-
-void testTriangles() {
-    int           n, i, cx = width()  / 2 - 1,
-                        cy = height() / 2 - 1;
-
-    fillScreen(BLACK);
-    n     = min(cx, cy);
-    for (i = 0; i < n; i += 5) {
-        drawTriangle(
-            cx    , cy - i, // peak
-            cx - i, cy + i, // bottom left
-            cx + i, cy + i, // bottom right
-            color565(0, 0, i));
-    }
-
-}
-
-void testFilledTriangles() {
-    int           i, cx = width()  / 2 - 1,
-                     cy = height() / 2 - 1;
-
-    fillScreen(BLACK);
-    for (i = min(cx, cy); i > 10; i -= 5) {
-        fillTriangle(cx, cy - i, cx - i, cy + i, cx + i, cy + i,
-                         color565(0, i, i));
-        drawTriangle(cx, cy - i, cx - i, cy + i, cx + i, cy + i,
-                         color565(i, i, 0));
-    }
-}
-
-void testRoundRects() {
-    int           w, i, i2, red, step,
-                  cx = width()  / 2 - 1,
-                  cy = height() / 2 - 1;
-
-    fillScreen(BLACK);
-    w     = min(width(), height());
-    red = 0;
-    step = (256 * 6) / w;
-    for (i = 0; i < w; i += 6) {
-        i2 = i / 2;
-        red += step;
-        drawRoundRect(cx - i2, cy - i2, i, i, i / 8, color565(red, 0, 0));
-    }
-
-}
-
-void testFilledRoundRects() {
-    int           i, i2, green, step,
-                  cx = width()  / 2 - 1,
-                  cy = height() / 2 - 1;
-
-    fillScreen(BLACK);
-    green = 256;
-    step = (256 * 6) / min(width(), height());
-    for (i = min(width(), height()); i > 20; i -= 6) {
-        i2 = i / 2;
-        green -= step;
-        fillRoundRect(cx - i2, cy - i2, i, i, i / 8, color565(0, green, 0));
-    }
-
-}
-
-
-
-void drawChar(int16_t x, int16_t y, unsigned char c, uint16_t color, uint16_t bg, uint8_t size)
-{
-	{ // Custom font
-
-        // Character is assumed previously filtered by write() to eliminate
-        // newlines, returns, non-printable characters, etc.  Calling
-        // drawChar() directly with 'bad' characters of font may cause mayhem!
-
-        c -= (uint8_t)pgm_read_byte(&gfxFont->first);
-        GFXglyph *glyph  = &(((GFXglyph *)pgm_read_pointer(&gfxFont->glyph))[c]);
-        uint8_t  *bitmap = (uint8_t *)pgm_read_pointer(&gfxFont->bitmap);
-
-        uint16_t bo = pgm_read_word(&glyph->bitmapOffset);
-        uint8_t  w  = pgm_read_byte(&glyph->width),
-                 h  = pgm_read_byte(&glyph->height);
-        int8_t   xo = pgm_read_byte(&glyph->xOffset),
-                 yo = pgm_read_byte(&glyph->yOffset);
-        uint8_t  xx, yy, bits = 0, bit = 0;
-        int16_t  xo16 = 0, yo16 = 0;
-
-        if(size > 1) {
-            xo16 = xo;
-            yo16 = yo;
-        }
-
-        for(yy=0; yy<h; yy++) {
-            for(xx=0; xx<w; xx++) {
-                if(!(bit++ & 7)) {
-                    bits = pgm_read_byte(&bitmap[bo++]);
-                }
-                if(bits & 0x80) {
-                    if(size == 1) {
-                        writePixel(x+xo+xx, y+yo+yy, color);
-                    } else {
-                        fillRect(x+(xo16+xx)*size, y+(yo16+yy)*size,
-                          size, size, color);
-                    }
-                }
-                bits <<= 1;
-            }
-        }
-
-    } // End classic vs custom font
-}
-/**************************************************************************/
-/*!
-    @brief  Print one byte/character of data, used to support print()
-    @param  c  The 8-bit ascii character to write
-*/
-/**************************************************************************/
-size_t write(uint8_t c)
-{
-	{
-
-        if(c == '\n') {
-            cursor_x  = 0;
-            cursor_y += (int16_t)textsize *
-                        (uint8_t)pgm_read_byte(&gfxFont->yAdvance);
-        } else if(c != '\r') {
-            uint8_t first = pgm_read_byte(&gfxFont->first);
-            if((c >= first) && (c <= (uint8_t)pgm_read_byte(&gfxFont->last))) {
-                GFXglyph *glyph = &(((GFXglyph *)pgm_read_pointer(
-                  &gfxFont->glyph))[c - first]);
-                uint8_t   w     = pgm_read_byte(&glyph->width),
-                          h     = pgm_read_byte(&glyph->height);
-                if((w > 0) && (h > 0)) { // Is there an associated bitmap?
-                    int16_t xo = (int8_t)pgm_read_byte(&glyph->xOffset); // sic
-                    if(wrap && ((cursor_x + textsize * (xo + w)) > _width)) {
-                        cursor_x  = 0;
-                        cursor_y += (int16_t)textsize *
-                          (uint8_t)pgm_read_byte(&gfxFont->yAdvance);
-                    }
-                    drawChar(cursor_x, cursor_y, c, textcolor, textbgcolor, textsize);
-                }
-                cursor_x += (uint8_t)pgm_read_byte(&glyph->xAdvance) * (int16_t)textsize;
-            }
-        }
-
-    }
-    return 1;
-}
-
-
-/**************************************************************************/
-/*!
-    @brief Set the font to display when print()ing, either custom or default
-    @param  f  The GFXfont object, if NULL use built in 6x8 font
-*/
-/**************************************************************************/
-void setFont(const GFXfont *f) {
-    if(f) {            // Font struct pointer passed in?
-        if(!gfxFont) { // And no current font struct?
-            // Switching from classic to new font behavior.
-            // Move cursor pos down 6 pixels so it's on baseline.
-            cursor_y += 6;
-        }
-    } else if(gfxFont) { // NULL passed.  Current font struct defined?
-        // Switching from new to classic font behavior.
-        // Move cursor pos up 6 pixels so it's at top-left of char.
-        cursor_y -= 6;
-    }
-    gfxFont = (GFXfont *)f;
-}
-
-
-/**************************************************************************/
-/*!
-    @brief    Helper to determine size of a character with current font/size.
-       Broke this out as it's used by both the - and RAM-resident getTextBounds() functions.
-    @param    c     The ascii character in question
-    @param    x     Pointer to x location of character
-    @param    y     Pointer to y location of character
-    @param    minx  Minimum clipping value for X
-    @param    miny  Minimum clipping value for Y
-    @param    maxx  Maximum clipping value for X
-    @param    maxy  Maximum clipping value for Y
-*/
-/**************************************************************************/
-void charBounds(char c, int16_t *x, int16_t *y, int16_t *minx, int16_t *miny, int16_t *maxx, int16_t *maxy)
-{
-
-    if(gfxFont) {
-
-        if(c == '\n') { // Newline?
-            *x  = 0;    // Reset x to zero, advance y by one line
-            *y += textsize * (uint8_t)pgm_read_byte(&gfxFont->yAdvance);
-        } else if(c != '\r') { // Not a carriage return; is normal char
-            uint8_t first = pgm_read_byte(&gfxFont->first),
-                    last  = pgm_read_byte(&gfxFont->last);
-            if((c >= first) && (c <= last)) { // Char present in this font?
-                GFXglyph *glyph = &(((GFXglyph *)pgm_read_pointer(
-                  &gfxFont->glyph))[c - first]);
-                uint8_t gw = pgm_read_byte(&glyph->width),
-                        gh = pgm_read_byte(&glyph->height),
-                        xa = pgm_read_byte(&glyph->xAdvance);
-                int8_t  xo = pgm_read_byte(&glyph->xOffset),
-                        yo = pgm_read_byte(&glyph->yOffset);
-                if(wrap && ((*x+(((int16_t)xo+gw)*textsize)) > _width)) {
-                    *x  = 0; // Reset x to zero, advance y by one line
-                    *y += textsize * (uint8_t)pgm_read_byte(&gfxFont->yAdvance);
-                }
-                int16_t ts = (int16_t)textsize,
-                        x1 = *x + xo * ts,
-                        y1 = *y + yo * ts,
-                        x2 = x1 + gw * ts - 1,
-                        y2 = y1 + gh * ts - 1;
-                if(x1 < *minx) *minx = x1;
-                if(y1 < *miny) *miny = y1;
-                if(x2 > *maxx) *maxx = x2;
-                if(y2 > *maxy) *maxy = y2;
-                *x += xa * ts;
-            }
-        }
-
-    } else { // Default font
-
-        if(c == '\n') {                     // Newline?
-            *x  = 0;                        // Reset x to zero,
-            *y += textsize * 8;             // advance y one line
-            // min/max x/y unchaged -- that waits for next 'normal' character
-        } else if(c != '\r') {  // Normal char; ignore carriage returns
-            if(wrap && ((*x + textsize * 6) > _width)) { // Off right?
-                *x  = 0;                    // Reset x to zero,
-                *y += textsize * 8;         // advance y one line
-            }
-            int x2 = *x + textsize * 6 - 1, // Lower-right pixel of char
-                y2 = *y + textsize * 8 - 1;
-            if(x2 > *maxx) *maxx = x2;      // Track max x, y
-            if(y2 > *maxy) *maxy = y2;
-            if(*x < *minx) *minx = *x;      // Track min x, y
-            if(*y < *miny) *miny = *y;
-            *x += textsize * 6;             // Advance x one char
-        }
-    }
-}
-
-/**************************************************************************/
-/*!
-    @brief    Helper to determine size of a string with current font/size. Pass string and a cursor position, returns UL corner and W,H.
-    @param    str     The ascii string to measure
-    @param    x       The current cursor X
-    @param    y       The current cursor Y
-    @param    x1      The boundary X coordinate, set by function
-    @param    y1      The boundary Y coordinate, set by function
-    @param    w      The boundary width, set by function
-    @param    h      The boundary height, set by function
-*/
-/**************************************************************************/
-void getTextBounds(const char *str, int16_t x, int16_t y, int16_t *x1, int16_t *y1, uint16_t *w, uint16_t *h) {
-    uint8_t c; // Current character
-
-    *x1 = x;
-    *y1 = y;
-    *w  = *h = 0;
-
-    int16_t minx = _width, miny = _height, maxx = -1, maxy = -1;
-
-    while((c = *str++))
-        charBounds(c, &x, &y, &minx, &miny, &maxx, &maxy);
-
-    if(maxx >= minx) {
-        *x1 = minx;
-        *w  = maxx - minx + 1;
-    }
-    if(maxy >= miny) {
-        *y1 = miny;
-        *h  = maxy - miny + 1;
-    }
-}
-
-
-void printnewtstr (int row, uint16_t txtcolor, const GFXfont *f, uint8_t txtsize, uint8_t *str)
-{
-	setFont(f);
-	textcolor = txtcolor;
-	textsize = (txtsize > 0) ? txtsize : 1;
-	setCursor(0, row);
-	while (*str) write (*str++);
-}
-
-void printstr (uint8_t *str)
-{
-	while (*str) write (*str++);
-}
-
-void setTextWrap(uint8_t w) { wrap = w; }
-
-void setTextColor (uint16_t color)
-{
-	textcolor = color;
-}
-
-void setTextSize (uint8_t size)
-{
-	textsize = size;
-}
-
-void setCursor(int16_t x, int16_t y) { cursor_x = x; cursor_y = y; }
-
-uint8_t getRotation (void)
-{
-	return rotation;
-}
-
-void scrollup (uint16_t speed)
-{
-     uint16_t maxscroll;
-     if (getRotation() & 1) maxscroll = width();
-     else maxscroll = height();
-     for (uint16_t i = 1; i <= maxscroll; i++)
-     {
-          vertScroll(0, maxscroll, i);
-         if (speed < 655) delay(speed*100);
-         else HAL_Delay(speed);
-     }
-
-}
-
-void scrolldown (uint16_t speed)
-{
-	uint16_t maxscroll;
-	if (getRotation() & 1) maxscroll = width();
-	     else maxscroll = height();
-	for (uint16_t i = 1; i <= maxscroll; i++)
-	{
-		vertScroll(0, maxscroll, 0 - (int16_t)i);
-		if (speed < 655) delay(speed*100);
-		else HAL_Delay(speed);
-	}
-}
-

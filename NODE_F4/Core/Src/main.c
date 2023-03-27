@@ -632,7 +632,6 @@ void Start_XuLy_MHC(void const * argument)
 	  if(_man_hinh_chinh ==  true && _man_hinh_login == false && _man_hinh_setting == false && _keypressed == true)
 	  {
 		  _keypressed == false;
-		  printnewtstr(10,RED, &mono9x7bold, 1, "Dang chay task XuLy MHC");
 
 	  }
     osDelay(1);
@@ -656,7 +655,6 @@ void Start_XuLy_MHS(void const * argument)
 	  if(_man_hinh_setting ==  true && _man_hinh_chinh ==  false && _man_hinh_login ==  false && _keypressed == true)
 	  {
 		  _keypressed == false;
-		  printnewtstr(10,RED, &mono9x7bold, 1, "Dang chay task XuLy MHS");
 	  }
     osDelay(1);
   }
@@ -679,7 +677,6 @@ void Start_XuLy_MHL(void const * argument)
 	  if(_man_hinh_login == true && _man_hinh_chinh ==  false && _man_hinh_setting == false && _keypressed == true)
 	  {
 		  _keypressed == false;
-		  printnewtstr(10,RED, &mono9x7bold, 1, "Dang chay task XuLy MHL");
 	  }
     osDelay(1);
   }

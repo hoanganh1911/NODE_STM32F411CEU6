@@ -8,12 +8,6 @@
 #ifndef INC_USER_SETTING_H_
 #define INC_USER_SETTING_H_
 
-/*
- * user_setting.h
- *
- *  Created on: 02-Jul-2019
- *      Author: poe
- */
 
 
 
@@ -38,9 +32,6 @@
 #define D7_PIN GPIO_PIN_12
 
 
-
-#define  WIDTH    ((uint16_t)240)
-#define  HEIGHT   ((uint16_t)400)
 
 #define write_8(d) {					        \
 	GPIOA -> BSRR = (0x0F00 << 16U);			\
